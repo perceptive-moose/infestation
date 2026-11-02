@@ -23,7 +23,7 @@ to rush between moves.
 | Menu (☰) | Open the game's menu. |
 | Controls (▤) | Hide or show the touch dock. |
 | Fullscreen (⛶) | Enter or leave fullscreen when supported by the browser. |
-| Help (?) | Open the touch-control guide. |
+| Help (?) | Open the guide for your current input method. |
 
 The game's own menu buttons and map rooms also accept direct taps. Drag the
 map to explore it. The pad can highlight menu rows and adjust sliders;
@@ -33,6 +33,24 @@ Restart, Wait and Undo share the same style in the right-hand column, from top
 to bottom. Unavailable actions become disabled without moving the other buttons.
 Undo stays in its normal position after winning or losing. Wait never becomes
 a Continue button.
+
+### Input-aware instructions
+
+Phones start in touch mode, with the on-screen pad visible. Keyboard and
+controller keycaps, control legends and button prompts are hidden in touch
+mode. Tutorial notes instead describe the D-pad, hero portraits and
+**Move together**. Restart confirmation and the title screen use touch wording.
+The Help guide also follows the active input method.
+
+On a device with more than one input method, touch or pen input selects touch
+mode; a physical keyboard, mouse or freshly used controller selects its mode.
+Touch-generated keyboard events do not count as physical keyboard use. An idle
+connected controller, a previously held input or small stick drift cannot steal
+touch mode. The dock starts visible on touch devices and hidden on desktops;
+after that, **▤** controls its visibility. Changing input methods updates the
+instructions without resizing the puzzle. Hiding the dock alone does not
+change touch instructions into keyboard instructions, and showing it selects
+touch instructions.
 
 Restart preserves the previous attempt. If you make moves after restarting,
 Undo takes those back first; the next Undo restores the position you had before
@@ -71,11 +89,11 @@ clears queued future moves. Switching portraits preserves queued moves, so
 each hero can contribute a direction to the same turn. With the direction
 buttons released, Wait supplies waiting inputs for both heroes.
 
-Disconnect physical gamepads when using the touch buttons for both heroes.
-The original input system changes keyboard-to-hero routing when a gamepad is
-connected, and the touch pad sends those same keyboard inputs. Hero 1 uses the
-arrow keys and right Shift for synchronized input; hero 2 uses WASD and left Shift. The
-adapter intentionally preserves this existing game input model.
+An idle connected controller does not change which hero the touch pad controls.
+When you switch to physical controls, the original routing returns: the first
+controller moves the blue hero, while the keyboard or second controller moves
+the orange hero. Without a controller, arrow keys move the blue hero and WASD
+moves the orange hero.
 
 ## Layout and room tips
 
@@ -107,7 +125,8 @@ help. Touching or scrolling a tip releases held movement.
 
 Hiding the touch controls restores the game's own portrait panel. Rotating the
 device or toggling the dock can therefore change the board layout. In the
-game's landscape layout, its existing status and field-guide panel remains.
+game's landscape layout, its existing status and field-guide panel remains,
+while duplicate control rows are omitted when the touch dock is visible.
 The game's layout follows the available canvas size, which can differ from
 the device's orientation after the dock takes its share of the screen. Native
 builds keep the original HUD and tutorial presentation.
@@ -122,6 +141,7 @@ builds keep the original HUD and tutorial presentation.
 | `js/touch-shell.js` | Loading, audio activation, visibility, fullscreen, help and the JavaScript side of the game bridge. |
 | `js/touch-state.js` | Scene-aware action availability, hero controls, contextual labels and input cancellation. |
 | `js/touch-tips.js` | Tip identity, typewriter text, dismissal, suppression and scroll restoration. |
+| `js/input-mode.js` | Active touch, keyboard and controller detection, excluding synthetic events and stale controller input. |
 | `game/src/touch_ui.rs` | WebAssembly imports for dock state, control-side preference, selected hero, input cancellation, visibility and authored tip text, with native fallbacks. |
 | `game/src/scenes/level.rs` | Level layout adjustment, action availability and publication of the current room tip. |
 | `game/src/render/board.rs` | Matching selection ring on the touch-controlled hero. |
@@ -133,6 +153,12 @@ builds keep the original HUD and tutorial presentation.
 | `tests/touch-controls.test.cjs` | Input lifecycle and queue regression tests. |
 | `tests/touch-tips.test.cjs` | Tip content, visibility, identity and scroll regression tests. |
 | `tests/touch-state.test.cjs` | Hero-row gating, contextual actions, outcome states and cancellation regression tests. |
+| `tests/input-mode.test.cjs` | Initial device choice, real input transitions, synthetic input and controller activity regression tests. |
+
+Structured tutorial notes support an optional `touch` field alongside their
+keyboard/controller variants. All shipped device-specific notes have authored
+touch instructions. Old/custom structured notes without this field use generic
+touch-control guidance in touch mode; plain gameplay notes are unchanged.
 
 The pointer adapter keeps short taps active for at least 80 milliseconds and
 two animation frames so the game's polling loop can see them. It separates
@@ -154,7 +180,7 @@ by the page. `./serve.sh` builds the binary at the path used by `index.html`.
 Run the JavaScript regression tests from the repository root:
 
 ```sh
-node --test tests/touch-controls.test.cjs tests/touch-tips.test.cjs tests/touch-state.test.cjs
+node --test tests/touch-controls.test.cjs tests/touch-tips.test.cjs tests/touch-state.test.cjs tests/input-mode.test.cjs
 ```
 
 Build and run the web game with the normal source workflow:
@@ -169,7 +195,9 @@ Undo, the two-tap restart, hero switching and Move together. In portrait gamepla
 and minimize a long tip and step onto or away from a tutorial trigger: the
 board should stay at the same position and scale. Check rotating, hiding and
 showing controls, opening menus, and returning after the browser has been
-backgrounded. Check the native version with `cargo run -r` when changing the
+backgrounded. On a hybrid device, switch between touch, a physical keyboard or
+mouse, and a controller; verify both the displayed prompts and hero routing.
+Check the native version with `cargo run -r` when changing the
 shared Rust HUD code.
 
 The game still needs WebAssembly and a working WebGL context. Browsers without
@@ -178,7 +206,6 @@ lost graphics context. Fullscreen depends on browser support, and audio needs
 a real user gesture. Automated DOM/input tests do not establish rendering
 performance or compatibility on a physical phone.
 
-Some original tutorial wording still names keyboard keys. Settings scroll on
-short screens; portrait mode gives the panel more space. Progress uses this
+Settings scroll on short screens; portrait mode gives the panel more space. Progress uses this
 site's browser storage and is separate from
 progress on the original upstream site or another hosting origin.
