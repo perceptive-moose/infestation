@@ -15,9 +15,12 @@ AI Disclaimer: This game uses entirely AI-generated artwork, music and sound eff
 
 ## Touchscreen support
 
-- A compact directional pad, Wait, OK, Undo and Restart, plus hero selection
-  and synchronized moves for two-hero rooms. The controls expand across phone
-  widths and move to a narrow side dock on short landscape screens.
+- A classic directional pad with an inactive center, beside matching Restart,
+  Wait and Undo buttons. The controls expand across phone widths and move to
+  a side dock on short landscape screens.
+- Hero portraits and Move together appear only in two-hero rooms. Play and
+  menu confirmation appear only on the relevant screens; Continue stays on
+  the win card. The dock keeps the same geometry throughout a room.
 - In portrait gameplay, the touch dock replaces the duplicate instruction
   panel, giving its space back to the puzzle. Room tips appear in a scrollable,
   dismissible overlay; opening, closing or typing a tip does not resize or
@@ -70,10 +73,10 @@ The JavaScript tests use Node.js's built-in test runner and require no npm
 packages:
 
 ```sh
-node --test tests/touch-controls.test.cjs tests/touch-tips.test.cjs
+node --test tests/touch-controls.test.cjs tests/touch-tips.test.cjs tests/touch-state.test.cjs
 ```
 
-These cover input handling and room-tip state. Also test the served game on
+These cover input handling, adaptive controls and room-tip state. Also test the served game on
 physical phones: the Node tests do not exercise WebGL rendering, browser audio,
 fullscreen or device-specific touch behavior. The web game requires a browser
 with WebAssembly and working WebGL graphics support.

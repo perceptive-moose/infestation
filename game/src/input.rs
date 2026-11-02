@@ -218,7 +218,7 @@ impl InputState {
         }
     }
 
-    /// Reset all held timers, suppressing currently-held keys until they are released.
+    /// Reset held timers, suppressing carried-over holds until release or a fresh press.
     /// This prevents key presses from "carrying over" across level transitions.
     pub(crate) fn reset(&mut self) {
         for source in &mut self.held_move {
@@ -606,15 +606,23 @@ fn any_gp_pressed_multi(gp: &GamepadContext, btns: &[GamepadButton]) -> bool {
 
 const UNDO_REPEAT_RATE: f32 = 0.05;
 
-/// Sentinel value: input is suppressed until the key/button is released.
+/// Sentinel value: a carried-over hold is suppressed until release or a fresh press.
 const SUPPRESSED: f32 = -1.0;
+
+fn update_input_suppression(down: bool, pressed: bool, held: &mut f32) {
+    // A touch cancellation is acknowledged on the next game frame. A new tap
+    // may already have arrived by then, without an intervening poll observing
+    // the released key. Its fresh edge starts a new repeat delay; an old hold
+    // with no new edge must remain suppressed across scene changes.
+    if *held == SUPPRESSED && (!down || pressed) {
+        *held = 0.0;
+    }
+}
 
 /// Returns `Some(true)` for a fresh press, `Some(false)` for a held-repeat, `None` for no input.
 fn input_held(down: bool, pressed: bool, held: &mut f32, dt: f32) -> Option<bool> {
+    update_input_suppression(down, pressed, held);
     if *held == SUPPRESSED {
-        if !down {
-            *held = 0.0;
-        }
         return None;
     }
     if down {
@@ -633,10 +641,8 @@ fn input_held(down: bool, pressed: bool, held: &mut f32, dt: f32) -> Option<bool
 }
 
 fn input_repeat(down: bool, pressed: bool, held: &mut f32, dt: f32) -> bool {
+    update_input_suppression(down, pressed, held);
     if *held == SUPPRESSED {
-        if !down {
-            *held = 0.0;
-        }
         return false;
     }
     if down {
@@ -669,10 +675,8 @@ const NAV_REPEAT_RATE: f32 = 0.18;
 /// Like `input_repeat`, but repeating at a comfortable menu-scrolling rate.
 /// Stick deflection counts as a press when it starts.
 fn input_repeat_nav(down: bool, pressed: bool, held: &mut f32, dt: f32) -> bool {
+    update_input_suppression(down, pressed, held);
     if *held == SUPPRESSED {
-        if !down {
-            *held = 0.0;
-        }
         return false;
     }
     if down {
@@ -730,5 +734,48 @@ mod tests {
     #[test]
     fn holding_a_direction_keeps_stepping() {
         assert!(nav_steps(1.0) >= 3);
+    }
+
+    #[test]
+    fn a_fresh_move_after_reset_is_not_swallowed() {
+        let dt = 1.0 / 60.0;
+        let mut held = SUPPRESSED;
+        assert_eq!(input_held(true, false, &mut held, 1.0), None);
+        assert_eq!(held, SUPPRESSED);
+        // Release and a new press both arrived between two game frames.
+        assert_eq!(input_held(true, true, &mut held, dt), Some(true));
+        assert_eq!(input_held(true, false, &mut held, dt), None);
+    }
+
+    #[test]
+    fn a_fresh_undo_or_confirm_after_reset_is_not_swallowed() {
+        let dt = 1.0 / 60.0;
+        let mut held = SUPPRESSED;
+        assert!(!input_repeat(true, false, &mut held, 1.0));
+        assert_eq!(held, SUPPRESSED);
+        assert!(input_repeat(true, true, &mut held, dt));
+        assert!(!input_repeat(true, false, &mut held, dt));
+    }
+
+    #[test]
+    fn a_fresh_navigation_press_after_reset_is_not_swallowed() {
+        let dt = 1.0 / 60.0;
+        let mut held = SUPPRESSED;
+        assert!(!input_repeat_nav(true, false, &mut held, 1.0));
+        assert_eq!(held, SUPPRESSED);
+        assert!(input_repeat_nav(true, true, &mut held, dt));
+        assert!(!input_repeat_nav(true, false, &mut held, dt));
+    }
+
+    #[test]
+    fn releasing_a_carried_over_hold_clears_suppression() {
+        let dt = 1.0 / 60.0;
+        let mut movement = SUPPRESSED;
+        let mut repeat = SUPPRESSED;
+        let mut navigation = SUPPRESSED;
+        assert_eq!(input_held(false, false, &mut movement, dt), None);
+        assert!(!input_repeat(false, false, &mut repeat, dt));
+        assert!(!input_repeat_nav(false, false, &mut navigation, dt));
+        assert_eq!((movement, repeat, navigation), (0.0, 0.0, 0.0));
     }
 }
