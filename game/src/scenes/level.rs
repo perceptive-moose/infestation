@@ -17,6 +17,7 @@ use crate::render::palette::{self, Palette};
 use crate::render::shapes::radial_gradient;
 use crate::render::ui::ScreenLayout;
 use crate::scenes::{Ctx, FrameInput, Request};
+use crate::touch_ui::{self, Screen as TouchScreen, State as TouchState};
 use crate::world_map::{Theme, WORLD_MAP};
 
 mod director;
@@ -124,6 +125,26 @@ impl LevelScene {
         self.game.state.player_count()
     }
 
+    pub(crate) fn touch_state(&self) -> TouchState<'static> {
+        let (screen, mut actions) = match self.play_state() {
+            PlayState::Playing => (TouchScreen::Playing, touch_ui::DIRECTION | touch_ui::WAIT),
+            PlayState::Won => (TouchScreen::Won, 0),
+            PlayState::GameOver => (TouchScreen::Lost, 0),
+        };
+        if self.game.can_undo() {
+            actions |= touch_ui::UNDO;
+        }
+        if self.game.can_restart() {
+            actions |= touch_ui::RESTART;
+        }
+        TouchState {
+            room: self.level.name,
+            screen,
+            players: self.player_count(),
+            actions,
+        }
+    }
+
     /// The web page supplies controls and an independent room-tip overlay.
     /// Never depend on dialogue here: stepping onto/off a note must not move
     /// or resize the board. Landscape keeps its status and field guide panel.
@@ -210,16 +231,23 @@ impl LevelScene {
         }
     }
 
-    /// Reset presentation after undo/restart.
-    fn after_rewind(&mut self) {
+    /// Discard input waiting for another hero or an animation to finish.
+    /// The current turn and its animation keep running.
+    pub(crate) fn cancel_pending_input(&mut self) {
         self.pending = EnumMap::default();
         self.pending_timer = 0.0;
+        self.game.state.queued_actions = None;
+        self.restart_armed = None;
+    }
+
+    /// Reset presentation after undo/restart.
+    fn after_rewind(&mut self) {
+        self.cancel_pending_input();
         self.fx.clear();
         self.facings.snap(&self.game.state.grid);
         self.ended = None;
         self.death = self.game.state.death;
         self.blasts = 0;
-        self.restart_armed = None;
     }
 
     pub(crate) fn update(
@@ -483,6 +511,11 @@ impl LevelScene {
                 time: self.time,
                 shake: ctx.settings.screen_shake,
                 ghosts: &ghosts,
+                selected_player: if self.player_count() == 2 {
+                    touch_ui::selected_player()
+                } else {
+                    None
+                },
             },
         );
         self.draw_intro(sprites, board, layout.s);
@@ -556,6 +589,113 @@ mod tests {
         scene.after_rewind();
         assert!(!scene.action_enabled(UiAction::Undo));
         assert!(!scene.action_enabled(UiAction::Restart));
+    }
+
+    #[test]
+    fn touch_actions_follow_moves_and_undoable_restarts() {
+        let mut scene = scene_from_csv("▲,.,.");
+        let initial = scene.touch_state();
+        assert_eq!(initial.screen, TouchScreen::Playing);
+        assert_eq!(initial.players, 1);
+        assert_eq!(initial.actions, touch_ui::DIRECTION | touch_ui::WAIT);
+
+        assert!(scene.game.apply_action(Action::Move(Dir4::East)));
+        assert_eq!(
+            scene.touch_state().actions,
+            touch_ui::DIRECTION | touch_ui::WAIT | touch_ui::UNDO | touch_ui::RESTART
+        );
+        scene.game.restart();
+        scene.after_rewind();
+        assert_eq!(
+            scene.touch_state().actions,
+            touch_ui::DIRECTION | touch_ui::WAIT | touch_ui::UNDO
+        );
+        scene.game.undo();
+        scene.after_rewind();
+        assert_ne!(scene.touch_state().actions & touch_ui::RESTART, 0);
+        scene.game.undo();
+        scene.after_rewind();
+        assert_eq!(scene.touch_state(), initial);
+    }
+
+    #[test]
+    fn touch_dock_keeps_two_heroes_after_a_fatal_turn() {
+        let mut scene = scene_from_csv("►,▷");
+        let before = scene.touch_state();
+        assert_eq!(before.players, 2);
+        scene.game.begin_actions(&[Action::Move(Dir4::East), Action::Stall]);
+        assert!(scene.game.is_animating());
+        assert!(!scene.card_visible());
+        let lost = scene.touch_state();
+        assert_eq!(lost.screen, TouchScreen::Lost);
+        assert_eq!(lost.room, before.room);
+        assert_eq!(lost.players, 2);
+        assert_eq!(scene.game.state.grid.find_players().len(), 1);
+        assert_eq!(lost.actions, touch_ui::UNDO | touch_ui::RESTART);
+
+        scene.game.undo();
+        scene.after_rewind();
+        assert_eq!(scene.touch_state(), before);
+    }
+
+    #[test]
+    fn touch_wait_stops_as_soon_as_the_winning_turn_resolves() {
+        let mut scene = scene_from_csv("►,R");
+        scene.game.begin_actions(&[Action::Move(Dir4::East)]);
+        assert!(scene.game.is_animating());
+        assert!(!scene.card_visible());
+        let state = scene.touch_state();
+        assert_eq!(state.screen, TouchScreen::Won);
+        assert_eq!(state.actions, touch_ui::UNDO | touch_ui::RESTART);
+        // Continue remains a deliberate tap on the game's outcome card.
+        assert_eq!(state.actions & touch_ui::CONFIRM, 0);
+    }
+
+    #[test]
+    fn interrupting_touch_clears_buffered_moves_but_preserves_the_current_turn() {
+        let mut scene = scene_from_csv(".,.,.\n.,▲,.\n.,.,.");
+        scene.game.begin_actions(&[Action::Move(Dir4::East)]);
+        scene.game.try_begin_actions(vec![Action::Move(Dir4::South)]);
+        scene.pending[Player::Player1] = Some(PendingAction {
+            action: Action::Move(Dir4::West),
+            synced: true,
+            fresh: true,
+        });
+        scene.pending_timer = 1.0;
+        scene.restart_armed = Some(scene.time);
+        let resolved = scene.game.state.grid.to_csv();
+        let history = scene.game.state.action_history.clone();
+        assert!(scene.game.is_animating());
+        assert!(scene.game.state.queued_actions.is_some());
+
+        scene.cancel_pending_input();
+
+        assert!(scene.pending.values().all(Option::is_none));
+        assert_eq!(scene.pending_timer, 0.0);
+        assert!(scene.game.state.queued_actions.is_none());
+        assert!(!scene.restart_pending());
+        assert!(scene.game.is_animating());
+        assert_eq!(scene.game.state.grid.to_csv(), resolved);
+        assert_eq!(scene.game.state.action_history, history);
+        while scene.game.is_animating() {
+            let _ = scene.game.animate(1.0);
+        }
+        assert_eq!(scene.game.state.grid.to_csv(), resolved);
+        assert_eq!(scene.game.state.action_history, history);
+    }
+
+    #[test]
+    fn room_tips_do_not_change_touch_dock_state() {
+        let mut scene = scene_from_csv("▲,.,△");
+        let before = scene.touch_state();
+        scene.dialogue = Dialogue {
+            text: "A room tip that appears while the puzzle stays in place.".to_string(),
+            player: Some(Player::Player2),
+            shown: 12.0,
+        };
+        assert_eq!(scene.touch_state(), before);
+        scene.dialogue = Dialogue::default();
+        assert_eq!(scene.touch_state(), before);
     }
 
     #[test]

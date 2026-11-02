@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#100d16">
   <meta name="description" content="Play David Spies’s Infestation with touchscreen controls. An experimental mobile adaptation of the original puzzle game.">
   <title>Infestation · Touch Demo</title>
-  <link rel="stylesheet" href="touch.css">
+  <link rel="stylesheet" href="touch.css?v=classic-dpad">
 </head>
-<body data-wasm-path="target/wasm32-unknown-unknown/release/infestation.wasm">
+<body data-wasm-path="target/wasm32-unknown-unknown/release/infestation.wasm?v=classic-dpad">
   <div class="app" id="app">
     <header class="topbar">
       <div class="brand"><strong>INFESTATION</strong><span>TOUCH DEMO</span></div>
@@ -43,32 +43,33 @@
         <div class="toast" id="toast" role="status" hidden></div>
       </section>
       <section class="controller" id="controller" aria-label="Touch controls">
-        <div class="controller-meta">
+        <div class="controller-meta" id="controller-meta" hidden>
           <div class="players" role="group" aria-label="Hero to control">
             <span class="meta-label">HERO</span>
-            <button type="button" class="player selected" data-player="p1" aria-label="Control hero 1" aria-pressed="true">1</button>
-            <button type="button" class="player" data-player="p2" aria-label="Control hero 2" aria-pressed="false">2</button>
+            <button type="button" class="player selected" data-player="p1" aria-label="Control blue hero" aria-pressed="true"><span class="hero-portrait" aria-hidden="true"></span><span class="hero-number" aria-hidden="true">1</span></button>
+            <button type="button" class="player" data-player="p2" aria-label="Control orange hero" aria-pressed="false"><span class="hero-portrait" aria-hidden="true"></span><span class="hero-number" aria-hidden="true">2</span></button>
           </div>
-          <button type="button" class="sync" id="sync" aria-pressed="false" title="Queue a move for each hero, then take both turns together"><span class="sync-light" aria-hidden="true"></span><span id="sync-label">Sync off</span></button>
-          <span class="hold-hint">HOLD TO REPEAT</span>
+          <button type="button" class="sync" id="sync" aria-pressed="false" title="Queue a move for each hero, then take both turns together"><span class="sync-light" aria-hidden="true"></span><span id="sync-label">Move together</span></button>
         </div>
         <div class="controller-body">
-          <div class="dpad" role="group" aria-label="Movement and wait">
-            <button type="button" class="direction up" data-direction="up" aria-label="Move up"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 14 7-7 7 7"/></svg></button>
-            <button type="button" class="direction left" data-direction="left" aria-label="Move left"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5-7 7 7 7"/></svg></button>
-            <button type="button" class="wait" data-code="Space" aria-label="Wait one turn"><span aria-hidden="true">•</span><small>WAIT</small></button>
-            <button type="button" class="direction right" data-direction="right" aria-label="Move right"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 5 7 7-7 7"/></svg></button>
-            <button type="button" class="direction down" data-direction="down" aria-label="Move down"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 10 7 7 7-7"/></svg></button>
+          <div class="dpad" role="group" aria-label="Movement">
+            <button type="button" class="direction up" data-direction="up" aria-label="Move up" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 14 7-7 7 7"/></svg></button>
+            <button type="button" class="direction left" data-direction="left" aria-label="Move left" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 5-7 7 7 7"/></svg></button>
+            <span class="dpad-center" aria-hidden="true"></span>
+            <button type="button" class="direction right" data-direction="right" aria-label="Move right" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m10 5 7 7-7 7"/></svg></button>
+            <button type="button" class="direction down" data-direction="down" aria-label="Move down" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 10 7 7 7-7"/></svg></button>
           </div>
-          <div class="actions">
-            <button type="button" class="confirm" data-code="Enter" aria-label="Confirm, play or continue"><span>OK <span aria-hidden="true">↵</span></span><small>PLAY · CONTINUE</small></button>
-            <div class="secondary-actions">
-              <button type="button" class="action" data-code="KeyU" aria-label="Undo last move or restart"><span aria-hidden="true">↶</span><small>UNDO</small></button>
-              <button type="button" class="action" data-code="KeyR" aria-label="Restart level, press twice to confirm"><span aria-hidden="true">↻</span><small>RESTART</small></button>
-            </div>
-            <p class="dock-note" id="dock-note">Tap to move. Think as long as you like.</p>
+          <div class="actions" id="play-actions">
+            <button type="button" class="action" data-code="KeyR" aria-label="Restart level, press twice to confirm" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.6 7M3 4v7h7"/></svg><span>Restart</span></button>
+            <button type="button" class="action" data-code="Space" aria-label="Wait one turn" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14M5 21h14M7 3v4l5 5-5 5v4M17 3v4l-5 5 5 5v4"/></svg><span>Wait</span></button>
+            <button type="button" class="action" data-code="KeyU" aria-label="Undo last move or restart" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 4-5 5 5 5M3 9h10a7 7 0 0 1 0 14" transform="translate(0 -2)"/></svg><span>Undo</span></button>
+          </div>
+          <div class="context-actions" id="context-actions" hidden>
+            <button type="button" class="confirm" id="context-confirm" data-code="Enter" disabled><span id="context-label">Play</span><span aria-hidden="true">↵</span></button>
+            <p id="context-hint">Tap the game or use the pad.</p>
           </div>
         </div>
+        <p class="dock-note" id="dock-note">Tap to move. Think as long as you like.</p>
       </section>
     </main>
   </div>
@@ -76,14 +77,13 @@
     <div class="help-heading"><div><div class="eyebrow">FIELD GUIDE</div><h2 id="help-title">The keep, by touch.</h2></div><button type="button" id="close-help" class="tool" aria-label="Close help">×</button></div>
     <p>Clear each room of rats. Everything moves when you do, so there’s no rush.</p>
     <dl class="control-guide">
-      <div><dt>Directional pad</dt><dd>Move in four directions. Your sword turns with you. Hold to keep moving.</dd></div>
+      <div><dt>Directional pad</dt><dd>Move in four directions. Your sword turns with you. Hold to keep moving. The center of the pad is inactive.</dd></div>
       <div><dt>Wait</dt><dd>Pass one turn without moving. In a two-hero room, both heroes wait.</dd></div>
-      <div><dt>OK</dt><dd>Start, enter a selected room, choose a menu item, or continue after a win.</dd></div>
       <div><dt>Undo / Restart</dt><dd>Undo takes back moves and restarts. Tap Restart twice within two seconds to confirm. Undo past the new moves to return to your previous attempt.</dd></div>
-      <div><dt>Two heroes</dt><dd>Select hero 1 or 2. For simultaneous moves, turn Sync on, choose hero 1’s direction, switch to hero 2, and choose their direction. Turn Sync off for ordinary moves. Turning Sync off does not erase a move already queued; choose a new direction to replace that hero’s input. Wait replaces both queued inputs with a waiting turn.</dd></div>
-      <div><dt>Map & menus</dt><dd>Tap the game’s buttons and map rooms directly; drag the map to explore. The pad and OK work in menus too.</dd></div>
+      <div><dt>Two heroes</dt><dd>Hero controls appear only in rooms with two heroes. Tap a portrait to select the blue or orange hero; the matching ring marks them on the board. Turn on Move together, choose one hero’s direction, switch portraits, then choose the other’s direction. Turn it off to clear queued moves and return to ordinary moves. Wait makes both heroes wait.</dd></div>
+      <div><dt>Map & menus</dt><dd>Tap the game’s buttons and map rooms directly; drag the map to explore. You can also use the pad and the Play, Enter room, or Select button shown for that screen. After a win, tap Continue on the win card. Undo stays in its usual position.</dd></div>
       <div><dt>Room tips</dt><dd>Tips appear above the controls without moving or resizing the puzzle. Scroll a long tip to read it all. Tap − to minimize it, then Room tip to reopen it.</dd></div>
-      <div><dt>More room</dt><dd>The game removes its duplicate portrait instruction panel while the touch controls are visible. Use ▤ to hide the touch controls and restore the game's own buttons. If a menu is cut off, rotate to portrait and hide the controls; the pad and OK can also navigate menus.</dd></div>
+      <div><dt>More room</dt><dd>The game removes its duplicate portrait instruction panel while the touch controls are visible. Use ▤ to hide the touch controls and restore the game's own buttons. If a menu is cut off, rotate to portrait or use the pad and Select to navigate it.</dd></div>
     </dl>
     <div class="demo-note"><strong>A playable prototype</strong><p>This runs the original game and its levels. The game’s own hints still mention keyboard keys. Progress is saved in this browser, separately from the original site. For two heroes using these touch controls, disconnect physical controllers.</p></div>
     <div class="help-links"><a href="https://github.com/perceptive-moose/infestation" target="_blank" rel="noopener">Touchscreen fork ↗</a><a href="https://github.com/davidspies/infestation" target="_blank" rel="noopener">Original source ↗</a></div>
@@ -98,8 +98,9 @@
   <script src="js/quad-gamepad.js"></script>
   <script src="js/screen-wake.js"></script>
   <script src="js/progress.js"></script>
-  <script src="js/touch-controls.js"></script>
+  <script src="js/touch-controls.js?v=classic-dpad"></script>
   <script src="js/touch-tips.js"></script>
-  <script src="js/touch-shell.js"></script>
+  <script src="js/touch-state.js?v=classic-dpad"></script>
+  <script src="js/touch-shell.js?v=classic-dpad"></script>
 </body>
 </html>
