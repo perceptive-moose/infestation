@@ -40,10 +40,11 @@ AI Disclaimer: This game uses entirely AI-generated artwork, music and sound eff
 - Direct taps on the game's menus and map, audio activation on a real gesture,
   and fullscreen where the browser supports it. Keyboard
   and controller controls remain available, and native builds retain their original HUD.
-- The opening Play screen accepts keyboard and controller confirmation. Help
-  pauses game input for every device, and returning to play suppresses carried
-  holds. Touch directions remain separate from physical keyboard input, so
-  changing instruction mode cannot change which hero a held key controls.
+- The game opens automatically when loading finishes. The first keyboard or
+  pointer gesture enables audio. Help pauses game input for every device,
+  and returning to play suppresses carried holds. Touch directions remain
+  separate from physical keyboard input, so changing instruction mode cannot
+  change which hero a held key controls.
 - Undoable restarts: undo past the moves in a fresh attempt to restore the
   previous one, then keep undoing through earlier moves and restarts.
 
@@ -95,7 +96,8 @@ node --test tests/*.test.cjs
 ```
 
 These cover input handling, device detection, adaptive controls, room-tip state,
-and integration of the browser shell with startup, Help and loading recovery.
+and integration of the browser shell with automatic startup, Help and loading
+recovery.
 Also test the served game on
 physical phones: the Node tests do not exercise WebGL rendering, browser audio,
 fullscreen or device-specific touch behavior. The web game requires a browser

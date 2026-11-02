@@ -302,7 +302,7 @@ test("repeated saved-layout publications do not rewrite the DOM or cancel input"
     for (const element of Object.values(s.elements)) assert.deepEqual(element.writes, []);
 });
 
-test("welcome, help and hidden controls disable input without changing room geometry", () => {
+test("loading, help and hidden controls disable input without changing room geometry", () => {
     const s = setup();
     s.room({ players: 2, actions: 15 });
     assert.equal(s.elements.Space.disabled, true);
