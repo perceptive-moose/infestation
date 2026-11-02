@@ -46,6 +46,7 @@ pub(crate) struct State<'a> {
 #[cfg(target_arch = "wasm32")]
 unsafe extern "C" {
     fn infestation_input_mode() -> u32;
+    fn infestation_input_blocked() -> u32;
     fn infestation_touch_input() -> u32;
     fn infestation_touch_controls_visible() -> u32;
     fn infestation_touch_selected_player() -> u32;
@@ -77,6 +78,19 @@ pub(crate) fn input_mode() -> InputMode {
         1 => InputMode::Touch,
         2 => InputMode::Controller,
         _ => InputMode::Keyboard,
+    }
+}
+
+/// The welcome/help page overlays block every game input source, regardless
+/// of whether the on-screen pad is shown. Native overlays live in the engine.
+pub(crate) fn input_blocked() -> bool {
+    #[cfg(target_arch = "wasm32")]
+    {
+        unsafe { infestation_input_blocked() != 0 }
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        false
     }
 }
 

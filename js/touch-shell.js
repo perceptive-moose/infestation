@@ -30,6 +30,10 @@
   let ready = false;
   let loadFailed = false;
   let engineTipVisible = false;
+  let wasInputBlocked = true;
+  const heldGameKeys = new Set();
+  const consumedKeys = new Set();
+  let previousPageButtons = new Map();
 
   function showToast(message, duration = 2600) {
     clearTimeout(toastTimer);
@@ -53,7 +57,6 @@
     onInterrupt() { dock.interrupt(); },
     onAction(action) {
       resumeAudio();
-      if (ready) welcome.hidden = true;
       syncTipVisibility();
       if (action.code === "KeyR") {
         showToast("Restart uses two taps within 2 seconds to confirm.", 2000);
@@ -87,9 +90,29 @@
     tips.setSuppressed(!engineTipVisible || help.open || !welcome.hidden
       || !controlsVisible || !ready || loadFailed);
   }
+  function inputBlocked() {
+    return !ready || loadFailed || help.open || !welcome.hidden
+      || document.visibilityState === "hidden";
+  }
+  function releasePhysicalKeys() {
+    // Keyup follows focus. A canvas key released over a dialog or another
+    // button must not stay down in miniquad. Ignore its later repeats until
+    // release (or a new physical press if the browser lost that release).
+    for (const code of heldGameKeys) {
+      consumedKeys.add(code);
+      canvas.dispatchEvent(new window.KeyboardEvent("keyup", { code }));
+    }
+    heldGameKeys.clear();
+  }
   function syncPresentation() {
-    const interactive = ready && !loadFailed && !help.open && welcome.hidden
-      && document.visibilityState !== "hidden";
+    const blocked = inputBlocked();
+    if (blocked !== wasInputBlocked) {
+      wasInputBlocked = blocked;
+      releasePhysicalKeys();
+      // Shell overlays own their input boundary even when the dock is hidden.
+      dock.interrupt();
+    }
+    const interactive = !blocked;
     dock.setAvailable(interactive && controlsVisible);
     menuButton.disabled = !interactive;
     syncTipVisibility();
@@ -116,23 +139,98 @@
     if (event.pointerType === "mouse" && event.target.closest?.(".topbar")) return;
     inputMode.pointer(event, Boolean(event.target.closest?.("#controller")));
   }, { capture: true, passive: true });
-  document.addEventListener("keydown", event => inputMode.keyboard(event), { capture: true });
   function focusGame() { canvas.focus({ preventScroll: true }); }
-  function closeHelp() { help.close(); syncPresentation(); focusGame(); }
-  start.addEventListener("click", () => {
+  function restoreFocus() {
+    if (!welcome.hidden && ready && !loadFailed) start.focus({ preventScroll: true });
+    else if (!inputBlocked()) focusGame();
+  }
+  function beginGame() {
+    if (!ready || loadFailed || help.open || welcome.hidden) return;
     resumeAudio();
     welcome.hidden = true;
     syncPresentation();
     focusGame();
-  });
+  }
+  function closeHelp() { help.close(); syncPresentation(); restoreFocus(); }
+  function consumeKey(event) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+  document.addEventListener("keydown", event => {
+    inputMode.keyboard(event);
+    if (!event.isTrusted) return;
+    if (consumedKeys.has(event.code)) {
+      if (event.repeat) { consumeKey(event); return; }
+      consumedKeys.delete(event.code);
+    }
+    const confirm = event.code === "Enter" || event.code === "Space";
+    if (help.open) {
+      if (event.code === "Escape" || (confirm
+        && (event.target.id === "close-help" || event.target.id === "help-done"))) {
+        consumedKeys.add(event.code);
+        consumeKey(event);
+        closeHelp();
+      }
+      return;
+    }
+    if (!welcome.hidden && ready && !loadFailed && confirm && !event.repeat
+      && (event.target === canvas || event.target === start || event.target === document.body)) {
+      consumedKeys.add(event.code);
+      consumeKey(event);
+      beginGame();
+      return;
+    }
+    if (inputBlocked()) {
+      if (event.target === canvas) {
+        // Let Tab leave the canvas while loading; its own handler traps Tab.
+        event.stopImmediatePropagation();
+        if (event.code !== "Tab") {
+          consumedKeys.add(event.code);
+          event.preventDefault();
+        }
+      }
+      return;
+    }
+    if (event.target === canvas) heldGameKeys.add(event.code);
+  }, { capture: true });
+  document.addEventListener("keyup", event => {
+    if (!event.isTrusted) return;
+    if (consumedKeys.delete(event.code)) {
+      consumeKey(event);
+      return;
+    }
+    if (heldGameKeys.delete(event.code) && event.target !== canvas) {
+      canvas.dispatchEvent(new window.KeyboardEvent("keyup", { code: event.code }));
+    }
+  }, { capture: true });
+  canvas.addEventListener("blur", releasePhysicalKeys);
+  window.addEventListener("blur", releasePhysicalKeys);
+  start.addEventListener("click", beginGame);
+  function pollPageButtons(pads) {
+    const next = new Map();
+    let confirmed = false;
+    for (let index = 0; index < Math.min(pads.length, 2); index += 1) {
+      if (!pads[index]?.connected) continue;
+      const buttons = [0, 1, 9].map(button => Boolean(pads[index].buttons?.[button]?.pressed));
+      const previous = previousPageButtons.get(index);
+      if (buttons.some((pressed, button) => pressed && !previous?.[button])) confirmed = true;
+      next.set(index, buttons);
+    }
+    previousPageButtons = next;
+    if (!confirmed || !ready || loadFailed || document.visibilityState === "hidden") return;
+    // The engine samples the blocking flag before and after this gamepad poll,
+    // consuming the activation frame and suppressing the hold until release.
+    if (help.open) closeHelp();
+    else if (!welcome.hidden) beginGame();
+  }
   document.getElementById("show-help").addEventListener("click", () => {
     help.showModal();
     syncPresentation();
   });
   document.getElementById("close-help").addEventListener("click", closeHelp);
   document.getElementById("help-done").addEventListener("click", closeHelp);
-  help.addEventListener("cancel", () => { dock.interrupt(); });
-  help.addEventListener("close", syncPresentation);
+  help.addEventListener("cancel", event => { event.preventDefault(); closeHelp(); });
+  help.addEventListener("close", () => { syncPresentation(); restoreFocus(); });
   document.addEventListener("visibilitychange", syncPresentation);
   const fullscreen = document.getElementById("fullscreen");
   if (!document.documentElement.requestFullscreen) fullscreen.hidden = true;
@@ -197,6 +295,7 @@
     version: 1,
     register_plugin(importObject) {
       importObject.env.infestation_input_mode = () => inputMode.code();
+      importObject.env.infestation_input_blocked = () => Number(inputBlocked());
       importObject.env.infestation_touch_input = () => controls.inputBits();
       // The game reclaims its generic instruction panel only while a usable
       // replacement is visible. Hide/show and readiness take effect next frame.
@@ -225,19 +324,25 @@
       };
       const count = importObject.env.sapp_gamepad_count;
       importObject.env.sapp_gamepad_count = function () {
-        inputMode.gamepads(navigator.getGamepads?.() || []);
+        const pads = navigator.getGamepads?.() || [];
+        inputMode.gamepads(pads);
         if (!ready) {
           ready = true;
-          start.disabled = false;
+          start.disabled = loadFailed;
           syncInputPresentation();
           syncPresentation();
+          if (!help.open && document.visibilityState !== "hidden") restoreFocus();
         }
+        pollPageButtons(pads);
         return count();
       };
     }
   });
   setTimeout(() => {
-    if (!ready && !loadFailed) showLoadFailure("Loading is taking longer than expected. Reload if it doesn’t finish.");
+    if (!ready && !loadFailed) {
+      document.getElementById("load-note").textContent =
+        "Loading is taking longer than expected. You can keep waiting or reload.";
+    }
   }, 45000);
   syncInputPresentation();
   syncPresentation();
