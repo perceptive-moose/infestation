@@ -22,6 +22,7 @@ pub(crate) enum MenuItem {
     Music,
     Sound,
     Shake,
+    TouchVisibility,
     TouchLayout,
     Export,
     Import,
@@ -149,7 +150,7 @@ impl Menu {
         }
         items.extend([MenuItem::Music, MenuItem::Sound, MenuItem::Shake]);
         if cfg!(target_arch = "wasm32") {
-            items.push(MenuItem::TouchLayout);
+            items.extend([MenuItem::TouchVisibility, MenuItem::TouchLayout]);
         }
         items.extend([MenuItem::Export, MenuItem::Import]);
         if !in_level {
@@ -310,8 +311,18 @@ impl Menu {
         }
     }
 
+    fn set_controls_visible(&self, shown: bool, ctx: &mut Ctx) {
+        if ctx.settings.touch_controls_visible != Some(shown) {
+            ctx.settings.touch_controls_visible = Some(shown);
+            ctx.settings.save();
+            ctx.audio.play(Sfx::UiMove);
+        }
+    }
+
     fn adjust(&self, item: MenuItem, delta: f32, ctx: &mut Ctx) {
-        if item == MenuItem::TouchLayout {
+        if item == MenuItem::TouchVisibility {
+            self.set_controls_visible(delta > 0.0, ctx);
+        } else if item == MenuItem::TouchLayout {
             self.set_dpad_right(delta > 0.0, ctx);
         } else if let Some(current) = slider_value(item, ctx.settings) {
             self.set_slider(item, current + delta, ctx);
@@ -328,6 +339,10 @@ impl Menu {
             MenuItem::Import => MenuChoice::Import,
             MenuItem::Title => MenuChoice::Title,
             MenuItem::Quit => MenuChoice::Quit,
+            MenuItem::TouchVisibility => {
+                self.set_controls_visible(!controls_shown(ctx.settings), ctx);
+                return None;
+            }
             MenuItem::TouchLayout => {
                 self.set_dpad_right(!ctx.settings.touch_dpad_right, ctx);
                 return None;
@@ -452,6 +467,14 @@ impl Menu {
                 MenuItem::Music => (SpriteId::IconMusic, "Music"),
                 MenuItem::Sound => (SpriteId::IconSound, "Sound"),
                 MenuItem::Shake => (SpriteId::IconGear, "Screen shake"),
+                MenuItem::TouchVisibility => (
+                    SpriteId::IconGear,
+                    if controls_shown(ctx.settings) {
+                        "On-screen controls: shown"
+                    } else {
+                        "On-screen controls: hidden"
+                    },
+                ),
                 MenuItem::TouchLayout => (
                     SpriteId::IconGear,
                     if ctx.settings.touch_dpad_right {
@@ -713,6 +736,12 @@ fn slider_value(item: MenuItem, settings: &Settings) -> Option<f32> {
     }
 }
 
+fn controls_shown(settings: &Settings) -> bool {
+    settings
+        .touch_controls_visible
+        .unwrap_or_else(crate::touch_ui::controls_visible)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -726,6 +755,7 @@ mod tests {
             MenuItem::Music,
             MenuItem::Sound,
             MenuItem::Shake,
+            MenuItem::TouchVisibility,
             MenuItem::TouchLayout,
             MenuItem::Export,
             MenuItem::Import,
@@ -748,7 +778,7 @@ mod tests {
             (296.0, 282.0, 0.42),
         ] {
             for time in [0.0, 0.09, 0.18, 1.0] {
-                let layout = MenuLayout::new(width, height, scale, 9, time, 0.0);
+                let layout = MenuLayout::new(width, height, scale, menu().items.len(), time, 0.0);
                 assert!(layout.card.x >= 0.0 && layout.card.right() <= width);
                 assert!(layout.card.y >= 0.0 && layout.card.bottom() <= height);
                 assert!(layout.viewport.y >= layout.card.y);
@@ -908,22 +938,24 @@ mod tests {
             menu.pointer_action(&PointerEvent::Up { start, end }, &scrolled),
             None
         );
-        let side_setting = scrolled.rows[6].center();
-        assert_eq!(scrolled.row_at(side_setting), Some(6));
-        assert_eq!(
-            menu.pointer_action(&PointerEvent::Down(side_setting), &scrolled),
-            None
-        );
-        assert_eq!(
-            menu.pointer_action(
-                &PointerEvent::Up {
-                    start: side_setting,
-                    end: side_setting
-                },
-                &scrolled
-            ),
-            Some(MenuPointerAction::Choose(6))
-        );
+        for index in [6, 7] {
+            let setting = scrolled.rows[index].center();
+            assert_eq!(scrolled.row_at(setting), Some(index));
+            assert_eq!(
+                menu.pointer_action(&PointerEvent::Down(setting), &scrolled),
+                None
+            );
+            assert_eq!(
+                menu.pointer_action(
+                    &PointerEvent::Up {
+                        start: setting,
+                        end: setting
+                    },
+                    &scrolled
+                ),
+                Some(MenuPointerAction::Choose(index))
+            );
+        }
     }
 
     #[test]
@@ -950,10 +982,11 @@ mod tests {
     #[test]
     fn focus_reveal_restores_a_row_scrolled_offscreen() {
         let mut menu = menu();
-        menu.focus = 8;
+        let last = menu.items.len() - 1;
+        menu.focus = last;
         menu.reveal_focus(&layout(&menu));
         let bottom = layout(&menu);
-        assert!(bottom.rows[8].bottom() <= bottom.viewport.bottom() + 0.001);
+        assert!(bottom.rows[last].bottom() <= bottom.viewport.bottom() + 0.001);
         menu.focus = 0;
         menu.reveal_focus(&bottom);
         let top = layout(&menu);
