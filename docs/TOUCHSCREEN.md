@@ -20,8 +20,7 @@ to rush between moves.
 | Restart | Tap twice within two seconds to start a fresh, undoable attempt. |
 | Blue / orange portrait | Choose the hero controlled by the directional pad. A matching ring marks that hero on the board. Shown only in two-hero rooms. |
 | Move together | Queue directions for a simultaneous two-hero turn. Shown only in two-hero rooms. |
-| Menu (☰) | Open the game's menu. |
-| Controls (▤) | Hide or show the touch dock. |
+| Menu (☰) | Open the game's menu, including On-screen controls: shown / hidden. |
 | Fullscreen (⛶) | Enter or leave fullscreen when supported by the browser. |
 | Help (?) | Open the guide for your current input method. |
 
@@ -36,7 +35,8 @@ a Continue button.
 
 ### Input-aware instructions
 
-Phones start in touch mode, with the on-screen pad visible. Keyboard and
+Phones start in touch mode, with the on-screen pad visible unless you have
+saved a preference to hide it. Keyboard and
 controller keycaps, control legends and button prompts are hidden in touch
 mode. Tutorial notes instead describe the D-pad, hero portraits and
 **Move together**. Restart confirmation and the title screen use touch wording.
@@ -46,8 +46,9 @@ On a device with more than one input method, touch or pen input selects touch
 mode; a physical keyboard, mouse or freshly used controller selects its mode.
 Touch-generated keyboard events do not count as physical keyboard use. An idle
 connected controller, a previously held input or small stick drift cannot steal
-touch mode. The dock starts visible on touch devices and hidden on desktops;
-after that, **▤** controls its visibility. Changing input methods updates the
+touch mode. Without a saved preference, the dock starts visible on touch
+devices and hidden on desktops. **On-screen controls: shown / hidden** in
+the game menu sets and saves your visibility preference. Changing input methods updates the
 instructions without resizing the puzzle. Hiding the dock alone does not
 change touch instructions into keyboard instructions, and showing it selects
 touch instructions.
@@ -60,12 +61,18 @@ making any moves adds no extra undo step. The move counter and exported solution
 describe only the current attempt. Leaving the room or reloading starts a new
 undo history; completed-room progress stays saved.
 
-### Settings and control sides
+### Settings and control layout
 
 Open the game menu with **☰**. Drag the **Music**, **Sound**, or **Screen shake**
 bar to adjust it, or tap a point on the bar. Values keep their existing eleven
 steps from 0 through 10. A slider stays attached to the gesture that started
 on it, so releasing outside the bar cannot activate another menu item.
+
+Tap **On-screen controls: shown / hidden** to show or hide the pad. The choice
+is saved with the other settings and restored on your next visit. The **☰**
+menu stays accessible when the pad is hidden, so you can always show it again.
+With keyboard or controller navigation, left selects hidden and right selects
+shown. Choosing shown also selects touch instructions.
 
 Tap **D-pad: left** or **D-pad: right** to swap the directional pad and the
 Restart / Wait / Undo column. The hero selectors follow the D-pad in two-hero
@@ -142,11 +149,11 @@ builds keep the original HUD and tutorial presentation.
 | `js/touch-state.js` | Scene-aware action availability, hero controls, contextual labels and input cancellation. |
 | `js/touch-tips.js` | Tip identity, typewriter text, dismissal, suppression and scroll restoration. |
 | `js/input-mode.js` | Active touch, keyboard and controller detection, excluding synthetic events and stale controller input. |
-| `game/src/touch_ui.rs` | WebAssembly imports for dock state, control-side preference, selected hero, input cancellation, visibility and authored tip text, with native fallbacks. |
+| `game/src/touch_ui.rs` | WebAssembly imports for dock state, visibility and control-side preferences, selected hero, input cancellation and authored tip text, with native fallbacks. |
 | `game/src/scenes/level.rs` | Level layout adjustment, action availability and publication of the current room tip. |
 | `game/src/render/board.rs` | Matching selection ring on the touch-controlled hero. |
-| `game/src/scenes/menu.rs` | Draggable sliders, scrollable settings and the control-side setting. |
-| `game/src/settings.rs` | Saved audio, screen-shake, control-side and map preferences. |
+| `game/src/scenes/menu.rs` | Draggable sliders, scrollable settings, and visibility and control-side settings. |
+| `game/src/settings.rs` | Saved audio, screen-shake, visibility, control-side and map preferences. |
 | `game/src/render/ui.rs` | Reclaims the portrait instruction panel's space for the board. |
 | `game/src/scenes/level/hud.rs` | Omits the replaced panel and its pointer targets. |
 | `game/src/app.rs` | Publishes scene state and coordinates tip visibility and input cancellation with scenes, menus and transitions. |
