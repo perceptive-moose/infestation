@@ -24,7 +24,7 @@ pub(crate) const UNDO: u32 = 4;
 pub(crate) const RESTART: u32 = 8;
 pub(crate) const CONFIRM: u32 = 16;
 
-/// The browser distinguishes real input from the touch dock's synthetic keys.
+/// The browser chooses which device's instructions to show.
 #[cfg(target_arch = "wasm32")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum InputMode {
@@ -46,6 +46,8 @@ pub(crate) struct State<'a> {
 #[cfg(target_arch = "wasm32")]
 unsafe extern "C" {
     fn infestation_input_mode() -> u32;
+    fn infestation_input_blocked() -> u32;
+    fn infestation_touch_input() -> u32;
     fn infestation_touch_controls_visible() -> u32;
     fn infestation_touch_selected_player() -> u32;
     fn infestation_touch_input_epoch() -> u32;
@@ -69,13 +71,40 @@ unsafe extern "C" {
     );
 }
 
-/// Browser input polling needs to distinguish touch from synthetic key events.
+/// Instruction mode does not determine which hero owns an input.
 #[cfg(target_arch = "wasm32")]
 pub(crate) fn input_mode() -> InputMode {
     match unsafe { infestation_input_mode() } {
         1 => InputMode::Touch,
         2 => InputMode::Controller,
         _ => InputMode::Keyboard,
+    }
+}
+
+/// The welcome/help page overlays block every game input source, regardless
+/// of whether the on-screen pad is shown. Native overlays live in the engine.
+pub(crate) fn input_blocked() -> bool {
+    #[cfg(target_arch = "wasm32")]
+    {
+        unsafe { infestation_input_blocked() != 0 }
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        false
+    }
+}
+
+/// Consume a snapshot of the touch dock's own held keys and fresh presses.
+/// See TouchInput in input.rs for the format; physical keys remain separate.
+#[must_use]
+pub(crate) fn take_input() -> u32 {
+    #[cfg(target_arch = "wasm32")]
+    {
+        unsafe { infestation_touch_input() }
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        0
     }
 }
 

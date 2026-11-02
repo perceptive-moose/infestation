@@ -210,13 +210,28 @@ impl App {
 
     /// Run one frame. Returns false when the game should exit.
     pub fn tick(&mut self) -> bool {
-        self.cancel_interrupted_touch_input();
+        // Polling a controller can dismiss a page overlay. That activation
+        // belongs to the page, so even its closing frame must not reach gameplay.
+        let page_was_blocking = touch_ui::input_blocked();
         self.gamepad.poll();
+        self.cancel_interrupted_touch_input();
+        self.input.sample_touch_input(touch_ui::take_input());
         let dt = get_frame_time().min(1.0 / 20.0);
-        let input = self.poll_input(dt);
+        let input = if page_was_blocking || touch_ui::input_blocked() {
+            self.input.track_device(&self.gamepad);
+            // Drain wheel/pointer events while obscured, and suppress held
+            // inputs until release. Fresh gamepad edges are ended below too.
+            let _ = self.input.poll_pointer();
+            self.input.reset();
+            None
+        } else {
+            Some(self.poll_input(dt))
+        };
         let hints = self.input.hints(&self.gamepad);
         let gamepads = self.gamepad.connected_count();
-        self.step(&input, hints, gamepads);
+        if let Some(input) = input {
+            self.step(&input, hints, gamepads);
+        }
         self.draw(&ScreenLayout::current(), hints, gamepads);
         self.gamepad.end_frame();
         !self.quit
@@ -420,10 +435,9 @@ impl App {
         // DOM tips have an app-level lifecycle, so they cannot linger on top of
         // another scene, a menu, an outcome card or the iris transition.
         match &self.scene {
-            Scene::Level(level) => level.publish_touch_tip(
-                layout,
-                self.overlay.is_none() && self.transition.is_none(),
-            ),
+            Scene::Level(level) => {
+                level.publish_touch_tip(layout, self.overlay.is_none() && self.transition.is_none())
+            }
             _ => crate::touch_ui::set_tip("", "", 0, 0, false),
         }
         let ctx = Ctx {
