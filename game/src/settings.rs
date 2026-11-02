@@ -14,6 +14,9 @@ pub(crate) struct Settings {
     pub(crate) screen_shake: f32,
     /// Put the touch D-pad on the right and the action buttons on the left.
     pub(crate) touch_dpad_right: bool,
+    /// Explicit on-screen control preference; None keeps the device default.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) touch_controls_visible: Option<bool>,
     /// The level the hero last stood at on the world map.
     pub(crate) map_level: Option<String>,
 }
@@ -25,6 +28,7 @@ impl Default for Settings {
             sfx_volume: 0.9,
             screen_shake: 1.0,
             touch_dpad_right: false,
+            touch_controls_visible: None,
             map_level: None,
         }
     }
@@ -41,6 +45,7 @@ mod tests {
         )
         .unwrap();
         assert!(!settings.touch_dpad_right);
+        assert_eq!(settings.touch_controls_visible, None);
         assert_eq!(settings.music_volume, 0.2);
         assert_eq!(settings.sfx_volume, 0.7);
         assert_eq!(settings.screen_shake, 0.4);
@@ -60,6 +65,26 @@ mod tests {
         assert_eq!(loaded.music_volume, 0.3);
         assert_eq!(loaded.sfx_volume, settings.sfx_volume);
         assert_eq!(loaded.screen_shake, settings.screen_shake);
+    }
+
+    #[test]
+    fn control_visibility_round_trips_without_losing_device_defaults() {
+        for preference in [None, Some(false), Some(true)] {
+            let settings = Settings {
+                touch_controls_visible: preference,
+                touch_dpad_right: true,
+                music_volume: 0.3,
+                ..Settings::default()
+            };
+            let saved = serde_json::to_value(&settings).unwrap();
+            if preference.is_none() {
+                assert!(saved.get("touch_controls_visible").is_none());
+            }
+            let loaded: Settings = serde_json::from_value(saved).unwrap();
+            assert_eq!(loaded.touch_controls_visible, preference);
+            assert!(loaded.touch_dpad_right);
+            assert_eq!(loaded.music_volume, 0.3);
+        }
     }
 }
 

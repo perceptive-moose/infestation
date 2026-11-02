@@ -374,10 +374,6 @@ canvas{
 .controls-hidden .controller{
   display:none
 }
-.controls-hidden #toggle-controls{
-  color:var(--gold);
-  background:#403020
-}
 .level-tip{
   position:absolute;
   left:10px;
