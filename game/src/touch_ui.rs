@@ -39,6 +39,7 @@ unsafe extern "C" {
     fn infestation_touch_controls_visible() -> u32;
     fn infestation_touch_selected_player() -> u32;
     fn infestation_touch_input_epoch() -> u32;
+    fn infestation_touch_layout(dpad_right: u32);
     fn infestation_touch_state(
         room_ptr: *const u8,
         room_len: u32,
@@ -55,6 +56,16 @@ unsafe extern "C" {
         shown: u32,
         visible: u32,
     );
+}
+
+/// The saved game setting is the source of truth for the browser's dock order.
+pub(crate) fn set_layout(dpad_right: bool) {
+    #[cfg(target_arch = "wasm32")]
+    unsafe {
+        infestation_touch_layout(u32::from(dpad_right));
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    let _ = dpad_right;
 }
 
 /// The page copies the room name synchronously; it never keeps a WASM pointer.

@@ -174,6 +174,9 @@
       importObject.env.infestation_touch_state = (roomPtr, roomLen, screen, players, actions) => {
         dock.update({ room: UTF8ToString(roomPtr, roomLen), screen, players, actions });
       };
+      importObject.env.infestation_touch_layout = dpadRight => {
+        dock.setDpadRight(Boolean(dpadRight));
+      };
       importObject.env.infestation_touch_selected_player = () => dock.selectedPlayer();
       importObject.env.infestation_touch_input_epoch = () => dock.inputEpoch();
       importObject.env.infestation_touch_tip = (roomPtr, roomLen, textPtr, textLen, player, shown, visible) => {
