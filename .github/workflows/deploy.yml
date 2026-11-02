@@ -43,6 +43,7 @@ jobs:
           cp index.html touch.css dist/
           cp -r js dist/
           cp assets/music/*.mp3 dist/assets/music/
+          cp assets/sprites.png dist/assets/
           cp target/wasm32-unknown-unknown/release/infestation.wasm dist/
           sed -i 's|target/wasm32-unknown-unknown/release/||' \
             dist/index.html
@@ -53,6 +54,8 @@ jobs:
           test -s dist/js/touch-controls.js
           test -s dist/js/touch-shell.js
           test -s dist/js/touch-tips.js
+          test -s dist/js/touch-state.js
+          test -s dist/assets/sprites.png
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4
