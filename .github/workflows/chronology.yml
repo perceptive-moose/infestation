@@ -1,0 +1,28 @@
+name: Restore chronological commit dates
+
+on:
+  push:
+    branches: [history/rewrite-2026-11-02]
+    paths:
+      - .github/workflows/chronology.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: infestation-chronology-2026-11-02
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'perceptive-moose/infestation' && github.actor == 'perceptive-moose'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify the dates against original commits and preserve every other field
+        run: python3 publish_chronology.py
+      - name: Preserve the previous history and publish with an exact lease
+        run: python3 publish_chronology.py --publish
