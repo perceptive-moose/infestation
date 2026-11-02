@@ -212,6 +212,7 @@ impl App {
     pub fn tick(&mut self) -> bool {
         self.cancel_interrupted_touch_input();
         self.gamepad.poll();
+        self.input.sample_touch_input(touch_ui::take_input());
         let dt = get_frame_time().min(1.0 / 20.0);
         let input = self.poll_input(dt);
         let hints = self.input.hints(&self.gamepad);
