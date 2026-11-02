@@ -192,6 +192,9 @@ impl LevelScene {
     }
 
     pub(crate) fn restart(&mut self, ctx: &mut Ctx) {
+        if !self.game.can_restart() {
+            return;
+        }
         self.game.restart();
         self.after_rewind();
         self.fx.wash(Color::new(1.0, 1.0, 1.0, 0.35), 0.35);
@@ -199,7 +202,7 @@ impl LevelScene {
     }
 
     fn undo(&mut self, ctx: &mut Ctx) {
-        if self.game.state.history.len() > 1 {
+        if self.game.can_undo() {
             self.game.undo();
             self.after_rewind();
             self.fx.wash(Color::new(0.45, 0.6, 1.0, 0.18), 0.22);
@@ -210,10 +213,11 @@ impl LevelScene {
     /// Reset presentation after undo/restart.
     fn after_rewind(&mut self) {
         self.pending = EnumMap::default();
+        self.pending_timer = 0.0;
         self.fx.clear();
         self.facings.snap(&self.game.state.grid);
         self.ended = None;
-        self.death = None;
+        self.death = self.game.state.death;
         self.blasts = 0;
         self.restart_armed = None;
     }
@@ -494,7 +498,8 @@ impl LevelScene {
     /// Whether a HUD action can be used right now.
     fn action_enabled(&self, action: UiAction) -> bool {
         match action {
-            UiAction::Undo | UiAction::Restart => self.game.state.history.len() > 1,
+            UiAction::Undo => self.game.can_undo(),
+            UiAction::Restart => self.game.can_restart(),
             UiAction::Wait => self.play_state() == PlayState::Playing,
             UiAction::Menu | UiAction::Continue | UiAction::Solution => true,
         }
@@ -512,4 +517,82 @@ pub(crate) fn draw_backdrop(palette: &Palette, center: Vec2) {
     clear_background(palette.backdrop.1);
     let r = vec2(screen_width(), screen_height()).length() * 0.62;
     radial_gradient(center, r, palette.backdrop.0, palette.backdrop.1);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::direction::Dir4;
+    use crate::grid::Grid;
+
+    fn scene_from_csv(csv: &str) -> LevelScene {
+        let mut scene = LevelScene::new(&crate::levels::all()[0]);
+        scene.game = Game::new(Grid::from_csv(csv));
+        scene.after_rewind();
+        scene
+    }
+
+    #[test]
+    fn undo_stays_enabled_after_restart() {
+        let mut scene = scene_from_csv("▲,.,.");
+        assert!(scene.game.apply_action(Action::Move(Dir4::East)));
+        scene.game.restart();
+        scene.after_rewind();
+
+        assert_eq!(scene.game.state.history.len(), 1);
+        assert!(scene.action_enabled(UiAction::Undo));
+        assert!(!scene.action_enabled(UiAction::Restart));
+
+        scene.game.undo();
+        scene.after_rewind();
+        assert_eq!(
+            scene.game.state.player_position(Player::Player1),
+            Some(Position::new(1, 0))
+        );
+        assert!(scene.action_enabled(UiAction::Undo));
+        assert!(scene.action_enabled(UiAction::Restart));
+
+        scene.game.undo();
+        scene.after_rewind();
+        assert!(!scene.action_enabled(UiAction::Undo));
+        assert!(!scene.action_enabled(UiAction::Restart));
+    }
+
+    #[test]
+    fn undoing_restart_restores_loss_without_pending_input() {
+        let mut scene = scene_from_csv("O\n▲");
+        scene.game.begin_actions(&[Action::Move(Dir4::North)]);
+        assert!(scene.game.is_animating());
+        assert_eq!(scene.death, None);
+
+        // Restart before the fatal animation delivers its death event.
+        scene.game.restart();
+        scene.after_rewind();
+        assert_eq!(scene.outcome(), None);
+        assert_eq!(scene.death, None);
+
+        scene.pending[Player::Player1] = Some(PendingAction {
+            action: Action::Move(Dir4::South),
+            synced: true,
+            fresh: true,
+        });
+        scene.pending_timer = SYNC_GRACE_PERIOD;
+        scene.restart_armed = Some(scene.time);
+        scene.game.undo();
+        scene.after_rewind();
+
+        assert_eq!(scene.outcome(), Some(PlayState::GameOver));
+        assert_eq!(scene.death, Some(Death::Swallowed));
+        assert!(scene.pending.values().all(Option::is_none));
+        assert_eq!(scene.pending_timer, 0.0);
+        assert!(!scene.restart_pending());
+        assert!(scene.action_enabled(UiAction::Undo));
+        assert!(!scene.action_enabled(UiAction::Wait));
+
+        scene.game.undo();
+        scene.after_rewind();
+        assert_eq!(scene.outcome(), None);
+        assert_eq!(scene.death, None);
+        assert!(scene.action_enabled(UiAction::Wait));
+    }
 }
