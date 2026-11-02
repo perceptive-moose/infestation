@@ -20,6 +20,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Test game state, scenes and original puzzle scenarios
         run: cargo test --locked -p infestation -p scenario_tests --lib
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # The game build generates the miniquad keyboard handlers used here.
+      - name: Test browser startup, overlays and input isolation
+        run: node tests/touch-shell.test.cjs
 
   test:
     runs-on: ubuntu-latest
@@ -36,7 +42,5 @@ jobs:
         run: node tests/touch-state.test.cjs
       - name: Test input mode detection
         run: node tests/input-mode.test.cjs
-      - name: Test browser startup, overlays and input isolation
-        run: node tests/touch-shell.test.cjs
       - name: Check browser shell syntax
         run: node --check js/touch-shell.js
