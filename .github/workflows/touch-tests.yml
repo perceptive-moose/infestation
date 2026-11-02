@@ -1,4 +1,4 @@
-name: Touch controls and room tips
+name: Game, touch controls and room tips
 
 on:
   pull_request:
@@ -9,6 +9,18 @@ permissions:
   contents: read
 
 jobs:
+  game:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test game state and scenes
+        run: cargo test --locked -p infestation --lib
+
   test:
     runs-on: ubuntu-latest
     steps:
