@@ -124,8 +124,40 @@ impl LevelScene {
         self.game.state.player_count()
     }
 
+    /// The web page supplies controls and an independent room-tip overlay.
+    /// Never depend on dialogue here: stepping onto/off a note must not move
+    /// or resize the board. Landscape keeps its status and field guide panel.
+    fn screen_layout(&self, layout: ScreenLayout) -> ScreenLayout {
+        if layout.portrait() && crate::touch_ui::controls_visible() {
+            layout.without_portrait_panel()
+        } else {
+            layout
+        }
+    }
+
+    /// Send the current note separately from board layout. Keeping its identity
+    /// while temporarily hidden preserves dismissal/scroll across pause menus.
+    pub(crate) fn publish_touch_tip(&self, layout: &ScreenLayout, unobscured: bool) {
+        let player = match self.dialogue.player {
+            Some(Player::Player1) => 1,
+            Some(Player::Player2) => 2,
+            None => 0,
+        };
+        crate::touch_ui::set_tip(
+            self.level.name,
+            &self.dialogue.text,
+            player,
+            self.dialogue.shown as u32,
+            unobscured
+                && layout.portrait()
+                && !self.card_visible()
+                && crate::touch_ui::controls_visible(),
+        );
+    }
+
     /// Where the hero is on screen, for centering transitions.
     pub(crate) fn focus(&self, layout: &ScreenLayout) -> Vec2 {
+        let layout = &self.screen_layout(*layout);
         let board = self.board_layout(layout);
         self.game
             .state
@@ -192,6 +224,7 @@ impl LevelScene {
         input: &FrameInput,
         layout: &ScreenLayout,
     ) -> Option<Request> {
+        let layout = &self.screen_layout(*layout);
         let dt = input.dt;
         self.time += dt;
         let board = self.board_layout(layout);
@@ -430,6 +463,7 @@ impl LevelScene {
     }
 
     pub(crate) fn draw(&self, ctx: &Ctx, layout: &ScreenLayout) {
+        let layout = &self.screen_layout(*layout);
         let sprites = ctx.sprites;
         let board = self.board_layout(layout);
         draw_backdrop(&self.palette, layout.main.center());
