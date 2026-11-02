@@ -4,19 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#100d16">
-  <meta name="description" content="Play David Spies’s Infestation with touchscreen controls. An experimental mobile adaptation of the original puzzle game.">
-  <title>Infestation · Touch Demo</title>
-  <link rel="stylesheet" href="touch.css?v=touch-settings">
+  <meta name="description" content="Play Infestation, David Spies’s turn-based puzzle game, with touch, keyboard or controller controls.">
+  <title>Infestation</title>
+  <link rel="stylesheet" href="touch.css?v=game-copy">
 </head>
-<body data-wasm-path="target/wasm32-unknown-unknown/release/infestation.wasm?v=touch-settings">
+<body data-wasm-path="target/wasm32-unknown-unknown/release/infestation.wasm?v=game-copy">
   <div class="app" id="app">
     <header class="topbar">
-      <div class="brand"><strong>INFESTATION</strong><span>TOUCH DEMO</span></div>
+      <div class="brand"><strong>INFESTATION</strong></div>
       <nav aria-label="Game tools">
         <button type="button" class="tool" data-code="Escape" aria-label="Game menu" title="Game menu">☰</button>
         <button type="button" class="tool" id="toggle-controls" aria-label="Hide touch controls" aria-expanded="true" title="Show or hide touch controls">▤</button>
         <button type="button" class="tool" id="fullscreen" aria-label="Enter fullscreen" title="Fullscreen">⛶</button>
-        <button type="button" class="tool" id="show-help" aria-label="Touch controls help" title="Help">?</button>
+        <button type="button" class="tool" id="show-help" aria-label="Controls and help" title="Help">?</button>
       </nav>
     </header>
     <main class="play-area">
@@ -34,10 +34,10 @@
           <div class="welcome-card">
             <div class="eyebrow">THE KEEP IS WAITING</div>
             <h1>One move.<br>A lot of rats.</h1>
-            <p>The original Infestation,<br>now with controls at your fingertips.</p>
+            <p>A turn-based puzzle adventure.<br>Every move matters.</p>
             <button type="button" class="start" id="start-game" disabled><span id="start-label">Loading game…</span><span aria-hidden="true">→</span></button>
             <p class="welcome-note" id="load-note" role="status">Preparing the original game and audio.</p>
-            <div class="credit">Game by <a href="https://github.com/davidspies/infestation" target="_blank" rel="noopener">David Spies</a> · experimental touch demo</div>
+            <div class="credit">Game by <a href="https://github.com/davidspies/infestation" target="_blank" rel="noopener">David Spies</a></div>
           </div>
         </div>
         <div class="toast" id="toast" role="status" hidden></div>
@@ -74,7 +74,7 @@
     </main>
   </div>
   <dialog id="help" aria-labelledby="help-title">
-    <div class="help-heading"><div><div class="eyebrow">FIELD GUIDE</div><h2 id="help-title">The keep, by touch.</h2></div><button type="button" id="close-help" class="tool" aria-label="Close help">×</button></div>
+    <div class="help-heading"><div><div class="eyebrow">FIELD GUIDE</div><h2 id="help-title">How to play</h2></div><button type="button" id="close-help" class="tool" aria-label="Close help">×</button></div>
     <p>Clear each room of rats. Everything moves when you do, so there’s no rush.</p>
     <dl class="control-guide">
       <div><dt>Directional pad</dt><dd>Move in four directions. Your sword turns with you. Hold to keep moving. The center of the pad is inactive.</dd></div>
@@ -86,7 +86,7 @@
       <div><dt>Room tips</dt><dd>Tips appear above the controls without moving or resizing the puzzle. Scroll a long tip to read it all. Tap − to minimize it, then Room tip to reopen it.</dd></div>
       <div><dt>More room</dt><dd>The game removes its duplicate portrait instruction panel while the touch controls are visible. Use ▤ to hide the touch controls and restore the game's own buttons. The settings panel scrolls when its options need more room.</dd></div>
     </dl>
-    <div class="demo-note"><strong>A playable prototype</strong><p>This runs the original game and its levels. The game’s own hints still mention keyboard keys. Progress is saved in this browser, separately from the original site. For two heroes using these touch controls, disconnect physical controllers.</p></div>
+    <div class="progress-note"><strong>Your progress</strong><p>This runs the original game and its levels. The game’s own hints still mention keyboard keys. Progress is saved in this browser, separately from the original site. For two heroes using these touch controls, disconnect physical controllers.</p></div>
     <div class="help-links"><a href="https://github.com/perceptive-moose/infestation" target="_blank" rel="noopener">Touchscreen fork ↗</a><a href="https://github.com/davidspies/infestation" target="_blank" rel="noopener">Original source ↗</a></div>
     <p class="attribution">Original game by David Spies. The game credits its art, music and sound effects as AI generated.</p>
     <button type="button" class="start help-done" id="help-done">Back to the game <span aria-hidden="true">→</span></button>
@@ -99,9 +99,9 @@
   <script src="js/quad-gamepad.js"></script>
   <script src="js/screen-wake.js"></script>
   <script src="js/progress.js"></script>
-  <script src="js/touch-controls.js?v=touch-settings"></script>
+  <script src="js/touch-controls.js?v=game-copy"></script>
   <script src="js/touch-tips.js"></script>
-  <script src="js/touch-state.js?v=touch-settings"></script>
-  <script src="js/touch-shell.js?v=touch-settings"></script>
+  <script src="js/touch-state.js?v=game-copy"></script>
+  <script src="js/touch-shell.js?v=game-copy"></script>
 </body>
 </html>

@@ -7,6 +7,7 @@ This fork adds touchscreen controls and a mobile layout to
 the original game, levels, artwork and audio, with changes to the web interface
 and the game's portrait HUD.
 
+Play this version at https://perceptive-moose.github.io/infestation/.
 Play the original upstream version at https://davidspies.github.io/infestation.
 Build and serve this fork locally, or publish a playable copy with
 [GitHub Pages](#publish-with-github-pages) using the instructions below.
