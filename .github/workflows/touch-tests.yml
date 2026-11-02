@@ -32,5 +32,7 @@ jobs:
         run: node tests/touch-controls.test.cjs
       - name: Test room tips
         run: node tests/touch-tips.test.cjs
+      - name: Test adaptive controls
+        run: node tests/touch-state.test.cjs
       - name: Check browser shell syntax
         run: node --check js/touch-shell.js
