@@ -232,6 +232,9 @@ impl App {
         if let Scene::Level(level) = &mut self.scene {
             level.cancel_pending_input();
         }
+        if let Some(Overlay::Menu(menu)) = &mut self.overlay {
+            menu.cancel_pointer_input();
+        }
     }
 
     fn touch_state(&self) -> TouchState<'static> {
@@ -262,7 +265,7 @@ impl App {
             match overlay {
                 Overlay::Menu(_) => {
                     state.screen = TouchScreen::Menu;
-                    state.actions = touch_ui::DIRECTION | touch_ui::CONFIRM;
+                    state.actions = touch_ui::DIRECTION;
                 }
                 Overlay::Code(_) => {
                     state.screen = TouchScreen::Code;
@@ -411,6 +414,7 @@ impl App {
     }
 
     pub(crate) fn draw(&mut self, layout: &ScreenLayout, hints: InputHints, gamepads: usize) {
+        touch_ui::set_layout(self.settings.touch_dpad_right);
         touch_ui::set_state(self.touch_state());
         // DOM tips have an app-level lifecycle, so they cannot linger on top of
         // another scene, a menu, an outcome card or the iris transition.
