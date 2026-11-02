@@ -121,7 +121,21 @@
   document.addEventListener("fullscreenchange", () => {
     fullscreen.setAttribute("aria-label", document.fullscreenElement ? "Exit fullscreen" : "Enter fullscreen");
   });
-  canvas.addEventListener("pointerdown", () => { focusGame(); resumeAudio(); });
+  canvas.addEventListener("pointerdown", event => {
+    focusGame();
+    resumeAudio();
+    // Mouse/pen releases outside the canvas must still finish a slider drag.
+    // Touch events already remain associated with their original target.
+    if (event.isPrimary && event.button === 0
+      && (event.pointerType === "mouse" || event.pointerType === "pen")) {
+      canvas.setPointerCapture(event.pointerId);
+    }
+  });
+  // These gestures belong to the canvas rather than a dock button. Notify the
+  // engine too, so an interrupted slider drag cannot resume with a later touch.
+  for (const event of ["pointercancel", "touchcancel"]) {
+    canvas.addEventListener(event, () => dock.interrupt());
+  }
   new ResizeObserver(() => {
     dock.interrupt();
     window.dispatchEvent(new Event("resize"));
@@ -159,6 +173,9 @@
         Number(controlsVisible && ready && !loadFailed);
       importObject.env.infestation_touch_state = (roomPtr, roomLen, screen, players, actions) => {
         dock.update({ room: UTF8ToString(roomPtr, roomLen), screen, players, actions });
+      };
+      importObject.env.infestation_touch_layout = dpadRight => {
+        dock.setDpadRight(Boolean(dpadRight));
       };
       importObject.env.infestation_touch_selected_player = () => dock.selectedPlayer();
       importObject.env.infestation_touch_input_epoch = () => dock.inputEpoch();
