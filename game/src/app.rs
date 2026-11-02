@@ -355,6 +355,15 @@ impl App {
     }
 
     pub(crate) fn draw(&mut self, layout: &ScreenLayout, hints: InputHints, gamepads: usize) {
+        // DOM tips have an app-level lifecycle, so they cannot linger on top of
+        // another scene, a menu, an outcome card or the iris transition.
+        match &self.scene {
+            Scene::Level(level) => level.publish_touch_tip(
+                layout,
+                self.overlay.is_none() && self.transition.is_none(),
+            ),
+            _ => crate::touch_ui::set_tip("", "", 0, 0, false),
+        }
         let ctx = Ctx {
             sprites: &self.sprites,
             audio: &mut self.audio,
