@@ -8,8 +8,25 @@
   const help = document.getElementById("help");
   const toast = document.getElementById("toast");
   const menuButton = document.querySelector('.topbar [data-code="Escape"]');
+  const controlsToggle = document.getElementById("toggle-controls");
   const tipRoot = document.getElementById("level-tip");
-  let controlsVisible = true;
+  const inputMode = InfestationInputMode.create({
+    touchDefault: InfestationInputMode.prefersTouch({
+      coarsePointer: window.matchMedia("(pointer: coarse)").matches,
+      finePointer: window.matchMedia("(any-pointer: fine)").matches,
+      maxTouchPoints: navigator.maxTouchPoints || 0
+    }),
+    onChange() {
+      // Release the dock's synthetic keys before physical input takes over.
+      // Prompt changes alone must not reset a fresh key/stick action, discard
+      // synchronized moves, or resize the puzzle.
+      if (presentedMode === "touch" && inputMode.mode() !== "touch") controls.releaseAll();
+      syncInputPresentation();
+      syncPresentation();
+    }
+  });
+  let controlsVisible = inputMode.controlsVisible();
+  let presentedMode = inputMode.mode();
   let toastTimer;
   let ready = false;
   let loadFailed = false;
@@ -49,9 +66,6 @@
     onPlayerChange() {
       resumeAudio();
       focusGame();
-      if (navigator.getGamepads?.()[0]?.connected) {
-        showToast("For touch control of both heroes, disconnect your controller.", 4500);
-      }
     },
     onSyncChange(enabled) {
       resumeAudio();
@@ -80,6 +94,34 @@
     menuButton.disabled = !interactive;
     syncTipVisibility();
   }
+  function syncInputPresentation() {
+    controlsVisible = inputMode.controlsVisible();
+    const mode = inputMode.mode();
+    presentedMode = mode;
+    document.body.dataset.inputMode = mode;
+    app.classList.toggle("controls-hidden", !controlsVisible);
+    controlsToggle.setAttribute("aria-expanded", String(controlsVisible));
+    controlsToggle.setAttribute("aria-label", controlsVisible ? "Hide touch controls" : "Show touch controls");
+    canvas.setAttribute("aria-label", mode === "touch"
+      ? "Game board. Use the direction buttons to move, Wait to pass a turn, and Undo to take back a move."
+      : mode === "controller" ? "Game board. Use your controller. Matching button prompts appear in the game."
+        : "Game board. Use the arrow keys or WASD to move, Space to wait, and U to undo.");
+    if (ready && !loadFailed) {
+      document.getElementById("start-label").textContent = "Play";
+      document.getElementById("load-note").textContent = mode === "touch"
+        ? "Sound starts when you tap Play."
+        : "Sound starts when you choose Play.";
+    }
+  }
+  // Capture identifies the real input before the dock emits synthetic keys.
+  document.addEventListener("pointerdown", event => {
+    // Toggling the dock must act on the visibility the button was displaying,
+    // without an automatic device change reversing that action first.
+    if (event.target.closest?.("#toggle-controls")) return;
+    if (event.pointerType === "mouse" && event.target.closest?.(".topbar")) return;
+    inputMode.pointer(event, Boolean(event.target.closest?.("#controller")));
+  }, { capture: true, passive: true });
+  document.addEventListener("keydown", event => inputMode.keyboard(event), { capture: true });
   function focusGame() { canvas.focus({ preventScroll: true }); }
   function closeHelp() { help.close(); syncPresentation(); focusGame(); }
   start.addEventListener("click", () => {
@@ -97,12 +139,8 @@
   help.addEventListener("cancel", () => { dock.interrupt(); });
   help.addEventListener("close", syncPresentation);
   document.addEventListener("visibilitychange", syncPresentation);
-  document.getElementById("toggle-controls").addEventListener("click", event => {
-    controlsVisible = !controlsVisible;
-    app.classList.toggle("controls-hidden", !controlsVisible);
-    event.currentTarget.setAttribute("aria-expanded", String(controlsVisible));
-    event.currentTarget.setAttribute("aria-label", controlsVisible ? "Hide touch controls" : "Show touch controls");
-    syncPresentation();
+  controlsToggle.addEventListener("click", () => {
+    inputMode.toggleControls();
     focusGame();
   });
   const fullscreen = document.getElementById("fullscreen");
@@ -156,10 +194,10 @@
   });
   canvas.addEventListener("webglcontextcreationerror", event => {
     console.warn("WebGL initialization failed:", event.statusMessage);
-    showLoadFailure("WebGL isn’t available in this browser. Open the demo in a browser with hardware graphics enabled.");
+    showLoadFailure("WebGL isn’t available in this browser. Open the game in a browser with hardware graphics enabled.");
   });
   window.addEventListener("error", event => {
-    console.error("Touch demo error:", event.message);
+    console.error("Infestation error:", event.message);
     if (!ready) showLoadFailure("The game couldn’t initialize. Try reloading in Chrome or Safari.");
   });
   // First poll happens once App has loaded sprites/audio and starts running.
@@ -167,6 +205,7 @@
     name: "infestation_touch_page",
     version: 1,
     register_plugin(importObject) {
+      importObject.env.infestation_input_mode = () => inputMode.code();
       // The game reclaims its generic instruction panel only while a usable
       // replacement is visible. Hide/show and readiness take effect next frame.
       importObject.env.infestation_touch_controls_visible = () =>
@@ -191,11 +230,11 @@
       };
       const count = importObject.env.sapp_gamepad_count;
       importObject.env.sapp_gamepad_count = function () {
+        inputMode.gamepads(navigator.getGamepads?.() || []);
         if (!ready) {
           ready = true;
           start.disabled = false;
-          document.getElementById("start-label").textContent = "Tap to play";
-          document.getElementById("load-note").textContent = "Sound starts with your tap. Then choose Play to begin.";
+          syncInputPresentation();
           syncPresentation();
         }
         return count();
@@ -205,6 +244,7 @@
   setTimeout(() => {
     if (!ready && !loadFailed) showLoadFailure("Loading is taking longer than expected. Reload if it doesn’t finish.");
   }, 45000);
+  syncInputPresentation();
   syncPresentation();
   load(document.body.dataset.wasmPath);
 })();

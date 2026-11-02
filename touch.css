@@ -94,14 +94,6 @@ button>*{
   letter-spacing:.12em;
   font-weight:900
 }
-.brand>span{
-  font-size:8px;
-  letter-spacing:.13em;
-  color:var(--muted);
-  padding:4px 5px;
-  border:1px solid var(--edge);
-  border-radius:4px
-}
 .topbar nav{
   display:flex;
   gap:2px
@@ -600,6 +592,11 @@ dialog>p{
 .control-guide{
   margin:24px 0
 }
+body:not([data-input-mode="touch"]) [data-input-guide="touch"],
+body:not([data-input-mode="keyboard"]) [data-input-guide="keyboard"],
+body:not([data-input-mode="controller"]) [data-input-guide="controller"]{
+  display:none
+}
 .control-guide>div{
   padding:12px 0;
   border-top:1px solid #392c44
@@ -615,14 +612,14 @@ dialog>p{
   line-height:1.7;
   color:#c5b4d1
 }
-.demo-note{
+.progress-note{
   border:1px solid #4f3d5c;
   border-radius:12px;
   padding:14px;
   background:#251a30;
   font-size:12px
 }
-.demo-note p{
+.progress-note p{
   line-height:1.7;
   color:#bbaac8;
   margin:6px 0 0
