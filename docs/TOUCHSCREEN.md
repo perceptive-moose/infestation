@@ -15,8 +15,8 @@ to rush between moves.
 | Directional pad | Move the selected hero. Tap for a step or hold to repeat. You can slide between directions. |
 | Wait | Pass a turn without moving. In two-hero rooms, it supplies a wait for both heroes. |
 | OK | Start, enter a selected room, choose a menu item or continue after winning. |
-| Undo | Take back a move. |
-| Restart | Tap twice within two seconds to confirm a restart. |
+| Undo | Take back a move or a restart. |
+| Restart | Tap twice within two seconds to start a fresh, undoable attempt. |
 | 1 / 2 | Choose the hero controlled by the directional pad. In solo rooms, either selection controls the same hero. |
 | Sync | Queue directions for a simultaneous two-hero turn. |
 | Menu (☰) | Open the game's menu. |
@@ -26,6 +26,14 @@ to rush between moves.
 
 The game's own menu buttons and map rooms also accept direct taps. Drag the
 map to explore it. The pad and OK provide another way to navigate menus.
+
+Restart preserves the previous attempt. If you make moves after restarting,
+Undo takes those back first; the next Undo restores the position you had before
+the restart. Keep undoing to reach earlier moves and earlier restarts. This also
+works after losing or winning, while you remain in that room. Restarting before
+making any moves adds no extra undo step. The move counter and exported solution
+describe only the current attempt. Leaving the room or reloading starts a new
+undo history; completed-room progress stays saved.
 
 ### Two heroes and Sync
 
