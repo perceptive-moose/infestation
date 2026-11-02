@@ -1,4 +1,4 @@
-/* Touch controls using Infestation's existing keyboard input handlers. */
+/* Touch controls with explicit hero input, plus an optional keyboard adapter. */
 (function (window) {
     "use strict";
 
@@ -9,6 +9,15 @@
     };
     const BUTTON_SELECTOR = "button[data-code], button[data-direction]";
     const PRIORITY_KEYS = new Set(["Space", "KeyU", "KeyR", "Escape", "Enter"]);
+    // Shared with game/src/input.rs. Low 15 bits are held input; bits 16..30
+    // are fresh presses. The engine consumes one snapshot per frame, keeping
+    // touch input separate from physical keys even when both are used together.
+    const INPUT_BITS = Object.freeze({
+        ArrowUp: 1 << 0, ArrowDown: 1 << 1, ArrowLeft: 1 << 2, ArrowRight: 1 << 3,
+        KeyW: 1 << 4, KeyS: 1 << 5, KeyA: 1 << 6, KeyD: 1 << 7,
+        ShiftRight: 1 << 8, ShiftLeft: 1 << 9, Space: 1 << 10,
+        KeyU: 1 << 11, KeyR: 1 << 12, Escape: 1 << 13, Enter: 1 << 14
+    });
 
     function keyInfo(code) {
         const named = {
@@ -31,7 +40,8 @@
         return null;
     }
 
-    function create({ canvas, root, onAction = function () {}, onInterrupt = function () {} }) {
+    function create({ canvas, root, onAction = function () {}, onInterrupt = function () {},
+        dispatchKeyboardEvents = true }) {
         if (!canvas || !root) throw new Error("Touch controls require a canvas and a root element.");
         const document = canvas.ownerDocument;
         const pointers = new Map();
@@ -42,13 +52,14 @@
         let player = "p1";
         let sync = false;
         let destroyed = false;
+        let pressedBits = 0;
 
         function ready() {
             return !destroyed && typeof canvas.onkeydown === "function";
         }
 
         function dispatchKey(type, code) {
-            if (typeof canvas.onkeydown !== "function") return;
+            if (!dispatchKeyboardEvents || typeof canvas.onkeydown !== "function") return;
             const [key, keyCode, location = 0] = keyInfo(code);
             const shiftKey = downCounts.has("ShiftLeft") || downCounts.has("ShiftRight");
             const event = new window.KeyboardEvent(type, {
@@ -65,7 +76,10 @@
         function acquireKey(code) {
             const count = downCounts.get(code) || 0;
             downCounts.set(code, count + 1);
-            if (count === 0) dispatchKey("keydown", code);
+            if (count === 0) {
+                pressedBits |= INPUT_BITS[code] || 0;
+                dispatchKey("keydown", code);
+            }
         }
 
         function releaseKey(code) {
@@ -225,6 +239,8 @@
         }
 
         function releaseOtherControls(keepCode) {
+            // A cancelled press must not linger until the engine's next poll.
+            pressedBits &= keepCode ? INPUT_BITS[keepCode] || 0 : 0;
             const captured = [];
             const keptButtons = new Set();
             for (const [id, pointer] of pointers) {
@@ -304,6 +320,13 @@
         });
 
         return {
+            inputBits() {
+                let heldBits = 0;
+                for (const code of downCounts.keys()) heldBits |= INPUT_BITS[code] || 0;
+                const snapshot = (heldBits | (pressedBits << 16)) >>> 0;
+                pressedBits = 0;
+                return snapshot;
+            },
             setPlayer(value) {
                 if (!DIRECTIONS[value]) throw new Error("Unknown player: " + value);
                 if (player !== value) releasePointerHolds();

@@ -16,7 +16,7 @@
       maxTouchPoints: navigator.maxTouchPoints || 0
     }),
     onChange() {
-      // Release the dock's synthetic keys before physical input takes over.
+      // Release dock holds before physical input takes over.
       // Prompt changes alone must not reset a fresh key/stick action, discard
       // synchronized moves, or resize the puzzle.
       if (presentedMode === "touch" && inputMode.mode() !== "touch") controls.releaseAll();
@@ -49,6 +49,7 @@
   const controls = InfestationTouch.create({
     canvas,
     root: document.body,
+    dispatchKeyboardEvents: false,
     onInterrupt() { dock.interrupt(); },
     onAction(action) {
       resumeAudio();
@@ -110,7 +111,7 @@
         : "Sound starts when you choose Play.";
     }
   }
-  // Capture identifies the real input before the dock emits synthetic keys.
+  // Real input chooses instructions; dock input has its own engine channel.
   document.addEventListener("pointerdown", event => {
     if (event.pointerType === "mouse" && event.target.closest?.(".topbar")) return;
     inputMode.pointer(event, Boolean(event.target.closest?.("#controller")));
@@ -196,6 +197,7 @@
     version: 1,
     register_plugin(importObject) {
       importObject.env.infestation_input_mode = () => inputMode.code();
+      importObject.env.infestation_touch_input = () => controls.inputBits();
       // The game reclaims its generic instruction panel only while a usable
       // replacement is visible. Hide/show and readiness take effect next frame.
       importObject.env.infestation_touch_controls_visible = () =>
