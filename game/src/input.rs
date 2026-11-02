@@ -221,6 +221,9 @@ impl InputState {
     /// Reset held timers, suppressing carried-over holds until release or a fresh press.
     /// This prevents key presses from "carrying over" across level transitions.
     pub(crate) fn reset(&mut self) {
+        // A cancelled browser touch may leave its emulated mouse button down.
+        // Forget the old gesture so it cannot resume dragging after an interruption.
+        self.mouse_start = None;
         for source in &mut self.held_move {
             for (_, held) in source.iter_mut() {
                 *held = SUPPRESSED;

@@ -12,6 +12,8 @@ pub(crate) struct Settings {
     pub(crate) sfx_volume: f32,
     /// How much the screen shakes, from 0 (not at all) to 1 (fully).
     pub(crate) screen_shake: f32,
+    /// Put the touch D-pad on the right and the action buttons on the left.
+    pub(crate) touch_dpad_right: bool,
     /// The level the hero last stood at on the world map.
     pub(crate) map_level: Option<String>,
 }
@@ -22,8 +24,42 @@ impl Default for Settings {
             music_volume: 0.5,
             sfx_volume: 0.9,
             screen_shake: 1.0,
+            touch_dpad_right: false,
             map_level: None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn older_settings_keep_their_values_and_default_to_the_left_dpad() {
+        let settings: Settings = serde_json::from_str(
+            r#"{"music_volume":0.2,"sfx_volume":0.7,"screen_shake":0.4,"map_level":"planks"}"#,
+        )
+        .unwrap();
+        assert!(!settings.touch_dpad_right);
+        assert_eq!(settings.music_volume, 0.2);
+        assert_eq!(settings.sfx_volume, 0.7);
+        assert_eq!(settings.screen_shake, 0.4);
+        assert_eq!(settings.map_level.as_deref(), Some("planks"));
+    }
+
+    #[test]
+    fn dpad_side_round_trips_with_the_other_settings() {
+        let settings = Settings {
+            touch_dpad_right: true,
+            music_volume: 0.3,
+            ..Settings::default()
+        };
+        let loaded: Settings =
+            serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
+        assert!(loaded.touch_dpad_right);
+        assert_eq!(loaded.music_volume, 0.3);
+        assert_eq!(loaded.sfx_volume, settings.sfx_volume);
+        assert_eq!(loaded.screen_shake, settings.screen_shake);
     }
 }
 
