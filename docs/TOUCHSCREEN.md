@@ -39,6 +39,17 @@ making any moves adds no extra undo step. The move counter and exported solution
 describe only the current attempt. Leaving the room or reloading starts a new
 undo history; completed-room progress stays saved.
 
+### Settings
+
+Open the game menu with **☰**. Drag the **Music**, **Sound**, or **Screen shake**
+bar to adjust it, or tap a point on the bar. Values keep their existing eleven
+steps from 0 through 10. A slider stays attached to the gesture that started
+on it, so releasing outside the bar cannot activate another menu item.
+
+On smaller screens, swipe the settings list outside a slider to scroll to
+the remaining options. A mouse wheel also scrolls, and D-pad or keyboard
+navigation brings the focused row into view.
+
 ### Two heroes and Move together
 
 For an ordinary move, leave Move together off and select the hero to move. For a
@@ -156,7 +167,7 @@ lost graphics context. Fullscreen depends on browser support, and audio needs
 a real user gesture. Automated DOM/input tests do not establish rendering
 performance or compatibility on a physical phone.
 
-Some original tutorial wording still names keyboard keys. Very short screens
-can leave menus cramped; try portrait, hide the controls, or navigate with the
-pad and Select. Progress uses this site's browser storage and is separate from
+Some original tutorial wording still names keyboard keys. Settings scroll on
+short screens; portrait mode gives the panel more space. Progress uses this
+site's browser storage and is separate from
 progress on the original upstream site or another hosting origin.

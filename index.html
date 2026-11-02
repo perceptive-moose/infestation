@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#100d16">
   <meta name="description" content="Play David Spies’s Infestation with touchscreen controls. An experimental mobile adaptation of the original puzzle game.">
   <title>Infestation · Touch Demo</title>
-  <link rel="stylesheet" href="touch.css?v=classic-dpad">
+  <link rel="stylesheet" href="touch.css?v=touch-settings">
 </head>
-<body data-wasm-path="target/wasm32-unknown-unknown/release/infestation.wasm?v=classic-dpad">
+<body data-wasm-path="target/wasm32-unknown-unknown/release/infestation.wasm?v=touch-settings">
   <div class="app" id="app">
     <header class="topbar">
       <div class="brand"><strong>INFESTATION</strong><span>TOUCH DEMO</span></div>
@@ -82,8 +82,9 @@
       <div><dt>Undo / Restart</dt><dd>Undo takes back moves and restarts. Tap Restart twice within two seconds to confirm. Undo past the new moves to return to your previous attempt.</dd></div>
       <div><dt>Two heroes</dt><dd>Hero controls appear only in rooms with two heroes. Tap a portrait to select the blue or orange hero; the matching ring marks them on the board. Turn on Move together, choose one hero’s direction, switch portraits, then choose the other’s direction. Turn it off to clear queued moves and return to ordinary moves. Wait makes both heroes wait.</dd></div>
       <div><dt>Map & menus</dt><dd>Tap the game’s buttons and map rooms directly; drag the map to explore. You can also use the pad and the Play, Enter room, or Select button shown for that screen. After a win, tap Continue on the win card. Undo stays in its usual position.</dd></div>
+      <div><dt>Settings</dt><dd>Open ☰ to change settings. Drag the Music, Sound, and Screen shake bars, or tap a point on a bar. Swipe the settings list to reach more options on smaller screens.</dd></div>
       <div><dt>Room tips</dt><dd>Tips appear above the controls without moving or resizing the puzzle. Scroll a long tip to read it all. Tap − to minimize it, then Room tip to reopen it.</dd></div>
-      <div><dt>More room</dt><dd>The game removes its duplicate portrait instruction panel while the touch controls are visible. Use ▤ to hide the touch controls and restore the game's own buttons. If a menu is cut off, rotate to portrait or use the pad and Select to navigate it.</dd></div>
+      <div><dt>More room</dt><dd>The game removes its duplicate portrait instruction panel while the touch controls are visible. Use ▤ to hide the touch controls and restore the game's own buttons. The settings panel scrolls when its options need more room.</dd></div>
     </dl>
     <div class="demo-note"><strong>A playable prototype</strong><p>This runs the original game and its levels. The game’s own hints still mention keyboard keys. Progress is saved in this browser, separately from the original site. For two heroes using these touch controls, disconnect physical controllers.</p></div>
     <div class="help-links"><a href="https://github.com/perceptive-moose/infestation" target="_blank" rel="noopener">Touchscreen fork ↗</a><a href="https://github.com/davidspies/infestation" target="_blank" rel="noopener">Original source ↗</a></div>
@@ -98,9 +99,9 @@
   <script src="js/quad-gamepad.js"></script>
   <script src="js/screen-wake.js"></script>
   <script src="js/progress.js"></script>
-  <script src="js/touch-controls.js?v=classic-dpad"></script>
+  <script src="js/touch-controls.js?v=touch-settings"></script>
   <script src="js/touch-tips.js"></script>
-  <script src="js/touch-state.js?v=classic-dpad"></script>
-  <script src="js/touch-shell.js?v=classic-dpad"></script>
+  <script src="js/touch-state.js?v=touch-settings"></script>
+  <script src="js/touch-shell.js?v=touch-settings"></script>
 </body>
 </html>

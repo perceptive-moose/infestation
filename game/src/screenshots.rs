@@ -394,7 +394,10 @@ fn screenshots() {
             nav.nav = Some(Dir4::South);
             let still = idle(1.0 / 60.0);
             for i in 0..30 {
-                menu.update(&mut ctx, if i == 0 { &nav } else { &still }, &layout);
+                assert!(
+                    menu.update(&mut ctx, if i == 0 { &nav } else { &still }, &layout)
+                        .is_none()
+                );
             }
             scene.draw(&ctx, &layout);
             menu.draw(&ctx, &layout);
