@@ -6,10 +6,16 @@ serve it from source using the [README instructions](../README.md).
 
 ## Playing
 
-Choose **Play** after loading, then **Play** on the title screen to begin.
-The initial gesture also
-allows the browser to start audio. The game is turn based, so there is no need
-to rush between moves.
+Choose **Play** after loading, then begin on the title screen. The opening
+screen accepts a tap/click, Enter or Space, or controller confirmation. Its
+activation is consumed so it cannot also move the game underneath. A keyboard
+or pointer gesture allows the browser to start audio. The game is turn based,
+so there is no need to rush between moves.
+
+Help blocks gameplay from every input device. Closing it suppresses controls
+that were already held, so they cannot cause an unintended move. If loading
+takes longer than expected, the page shows a warning and remains ready to
+recover when loading finishes.
 
 | Control | Action |
 | --- | --- |
@@ -44,7 +50,7 @@ The Help guide also follows the active input method.
 
 On a device with more than one input method, touch or pen input selects touch
 mode; a physical keyboard, mouse or freshly used controller selects its mode.
-Touch-generated keyboard events do not count as physical keyboard use. An idle
+Touch input is tracked separately from physical keyboard input. An idle
 connected controller, a previously held input or small stick drift cannot steal
 touch mode. Without a saved preference, the dock starts visible on touch
 devices and hidden on desktops. **On-screen controls: shown / hidden** in
@@ -97,10 +103,11 @@ each hero can contribute a direction to the same turn. With the direction
 buttons released, Wait supplies waiting inputs for both heroes.
 
 An idle connected controller does not change which hero the touch pad controls.
-When you switch to physical controls, the original routing returns: the first
-controller moves the blue hero, while the keyboard or second controller moves
-the orange hero. Without a controller, arrow keys move the blue hero and WASD
-moves the orange hero.
+Physical controls always keep their original routing: the first controller
+moves the blue hero, while the keyboard or second controller moves the orange
+hero. Without a controller, arrow keys move the blue hero and WASD moves the
+orange hero. Touching the screen changes the instructions without transferring
+a held keyboard direction to a different hero.
 
 ## Layout and room tips
 
@@ -144,12 +151,13 @@ builds keep the original HUD and tutorial presentation.
 | --- | --- |
 | `index.html` | Web page, control buttons, welcome/help UI and room-tip markup. |
 | `touch.css` | Compact responsive dock, safe areas and independent tip overlay. |
-| `js/touch-controls.js` | Pointer input, hero selection, Sync modifiers and keyboard-event dispatch to the canvas. |
-| `js/touch-shell.js` | Loading, audio activation, visibility, fullscreen, help and the JavaScript side of the game bridge. |
+| `js/touch-controls.js` | Pointer input, hero selection, Sync modifiers and independently polled touch actions. |
+| `js/touch-shell.js` | Loading, audio activation, visibility, fullscreen, Help, keyboard focus and the JavaScript side of the game bridge. |
 | `js/touch-state.js` | Scene-aware action availability, hero controls, contextual labels and input cancellation. |
 | `js/touch-tips.js` | Tip identity, typewriter text, dismissal, suppression and scroll restoration. |
 | `js/input-mode.js` | Active touch, keyboard and controller detection, excluding synthetic events and stale controller input. |
-| `game/src/touch_ui.rs` | WebAssembly imports for dock state, visibility and control-side preferences, selected hero, input cancellation and authored tip text, with native fallbacks. |
+| `game/src/touch_ui.rs` | WebAssembly imports for touch input, browser overlay blocking, dock state, settings, selected hero, cancellation and authored tip text, with native fallbacks. |
+| `game/src/input.rs` | Independent touch and physical input sources, original keyboard/controller routing and held-input suppression. |
 | `game/src/scenes/level.rs` | Level layout adjustment, action availability and publication of the current room tip. |
 | `game/src/render/board.rs` | Matching selection ring on the touch-controlled hero. |
 | `game/src/scenes/menu.rs` | Draggable sliders, scrollable settings, and visibility and control-side settings. |
@@ -161,6 +169,7 @@ builds keep the original HUD and tutorial presentation.
 | `tests/touch-tips.test.cjs` | Tip content, visibility, identity and scroll regression tests. |
 | `tests/touch-state.test.cjs` | Hero-row gating, contextual actions, outcome states and cancellation regression tests. |
 | `tests/input-mode.test.cjs` | Initial device choice, real input transitions, synthetic input and controller activity regression tests. |
+| `tests/touch-shell.test.cjs` | Startup confirmation, modal input isolation, focus/key-release handling and slow-load recovery using the actual browser modules. |
 
 Structured tutorial notes support an optional `touch` field alongside their
 keyboard/controller variants. All shipped device-specific notes have authored
@@ -178,16 +187,25 @@ when the scene changes or interaction is interrupted, while preserving the
 currently resolved turn and its animation. Changing available Undo/Restart
 flags alone does not cancel input or disrupt the two-tap Restart confirmation.
 
+The page publishes held touch actions separately from physical keys. The engine
+keeps independent directional repeat timers and hero ownership for those sources.
+Browser overlays block engine updates even when the touch pad is hidden, while
+drawing and readiness checks continue. The frame that closes an overlay through
+controller confirmation stays blocked, preventing the same press from also
+activating the game.
+
 The web page and WebAssembly binary should be built and served from the same
 revision. The updated game imports the state, visibility and tip callbacks registered
 by the page. `./serve.sh` builds the binary at the path used by `index.html`.
 
 ## Validation and browser limits
 
-Run the JavaScript regression tests from the repository root:
+Run the regression tests from the repository root. The Rust build also prepares
+the browser runtime used by the shell integration tests:
 
 ```sh
-node --test tests/touch-controls.test.cjs tests/touch-tips.test.cjs tests/touch-state.test.cjs tests/input-mode.test.cjs
+cargo test --locked -p infestation -p scenario_tests --lib
+node --test tests/*.test.cjs
 ```
 
 Build and run the web game with the normal source workflow:
@@ -206,6 +224,13 @@ backgrounded. On a hybrid device, switch between touch, a physical keyboard or
 mouse, and a controller; verify both the displayed prompts and hero routing.
 Check the native version with `cargo run -r` when changing the
 shared Rust HUD code.
+
+Also start from a fresh page using only the keyboard or controller. Hold a
+direction while opening Help, release it inside Help, then return to the game;
+the hero should stay still until a fresh input. In a two-hero room with a
+controller connected, keep a physical arrow held while touching the board and
+check that the keyboard continues controlling the same hero. Native menu
+Restart should clear a queued synchronized move even before the first turn.
 
 The game still needs WebAssembly and a working WebGL context. Browsers without
 usable hardware graphics support may be unable to start it; reload after a
