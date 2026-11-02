@@ -25,6 +25,8 @@ AI Disclaimer: This game uses entirely AI-generated artwork, music and sound eff
 - Direct taps on the game's menus and map, audio activation on a real gesture,
   a controls toggle, and fullscreen where the browser supports it. Keyboard
   controls remain available, and native builds retain their original HUD.
+- Undoable restarts: undo past the moves in a fresh attempt to restore the
+  previous one, then keep undoing through earlier moves and restarts.
 
 See the [touchscreen guide](docs/TOUCHSCREEN.md) for controls, two-hero caveats,
 implementation details and device checks.
@@ -54,7 +56,15 @@ uses the Rust 2024 edition.
   through junctions and completed levels, and play any level you can reach.
 - `cargo run -r --bin editor <level>` opens the level editor.
 
-### Touchscreen tests
+### Tests
+
+Run the game-state and scene regression tests, including undo across restarts:
+
+```sh
+cargo test --locked -p infestation --lib
+```
+
+On Ubuntu, native tests need `libasound2-dev`, `libudev-dev` and `pkg-config`.
 
 The JavaScript tests use Node.js's built-in test runner and require no npm
 packages:
@@ -75,7 +85,7 @@ Actions** as the source. If GitHub has disabled workflows in the new fork,
 enable them from the **Actions** tab.
 
 The **Deploy to GitHub Pages** workflow runs on pushes to `master` and can also
-be started manually. It runs the touch-input and room-tip tests, builds the
+be started manually. It runs the game, touch-input and room-tip tests, builds the
 current game with `Cargo.lock`, packages the matching browser files and music,
 and publishes the result. Future pushes to `master` update the playable site.
 The historical comparison versions remain in Git history; this workflow
