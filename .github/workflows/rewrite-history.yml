@@ -1,0 +1,28 @@
+name: Publish reviewed history reconstruction
+
+on:
+  push:
+    branches: [history/rewrite-2026-11-02]
+    paths:
+      - .github/workflows/rewrite-history.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: infestation-history-rewrite-2026-11-02
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'perceptive-moose/infestation' && github.actor == 'perceptive-moose'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify the prepared commit graph and unchanged file snapshots
+        run: python3 publish_history.py
+      - name: Publish only if master and its archive still match the reviewed original
+        run: python3 publish_history.py --publish
