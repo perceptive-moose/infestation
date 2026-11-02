@@ -8,7 +8,7 @@
         p2: { up: "KeyW", down: "KeyS", left: "KeyA", right: "KeyD" }
     };
     const BUTTON_SELECTOR = "button[data-code], button[data-direction]";
-    const META_KEYS = new Set(["KeyU", "KeyR", "Escape", "Enter"]);
+    const PRIORITY_KEYS = new Set(["Space", "KeyU", "KeyR", "Escape", "Enter"]);
 
     function keyInfo(code) {
         const named = {
@@ -31,7 +31,7 @@
         return null;
     }
 
-    function create({ canvas, root, onAction = function () {} }) {
+    function create({ canvas, root, onAction = function () {}, onInterrupt = function () {} }) {
         if (!canvas || !root) throw new Error("Touch controls require a canvas and a root element.");
         const document = canvas.ownerDocument;
         const pointers = new Map();
@@ -126,10 +126,10 @@
         function press(code, button, source) {
             if (!ready()) return null;
             keyInfo(code);
-            // An undo or scene change takes precedence over buffered movement.
-            // Keep this meta key's own lane so two fingers, or a quick re-tap,
+            // Wait, undo and scene changes take precedence over movement.
+            // Keep this action's own lane so two fingers, or a quick re-tap,
             // retain the same ownership and minimum-press guarantees.
-            if (META_KEYS.has(code)) releaseOtherControls(code);
+            if (PRIORITY_KEYS.has(code)) releaseOtherControls(code);
             const movingPlayer = movementPlayer(code);
             // Directions share one lane per player: sliding or pressing two
             // arrows never sends a diagonal chord to the game.
@@ -213,7 +213,7 @@
         }
 
         function pointerInterrupted(event) {
-            if (pointers.has(event.pointerId)) releaseAll();
+            if (pointers.has(event.pointerId)) interrupt();
         }
 
         function keyboardClick(event) {
@@ -270,6 +270,22 @@
             releaseOtherControls(null);
         }
 
+        function interrupt() {
+            releaseAll();
+            onInterrupt();
+        }
+
+        function releasePointerHolds() {
+            // Changing hero/mode should stop an old held direction, but a very
+            // quick first hero tap still needs to reach two game frames before
+            // its key is released. Already-released taps keep that guarantee.
+            for (const [id, pointer] of pointers) {
+                pointers.delete(id);
+                release(pointer.action);
+                if (pointer.capture.hasPointerCapture(id)) pointer.capture.releasePointerCapture(id);
+            }
+        }
+
         function listen(target, name, handler) {
             target.addEventListener(name, handler, { passive: false });
             listeners.push([target, name, handler]);
@@ -281,18 +297,23 @@
         listen(window, "pointerup", pointerUp);
         listen(window, "pointercancel", pointerInterrupted);
         listen(window, "lostpointercapture", pointerInterrupted);
-        listen(window, "blur", releaseAll);
-        listen(window, "pagehide", releaseAll);
+        listen(window, "blur", interrupt);
+        listen(window, "pagehide", interrupt);
         listen(document, "visibilitychange", function () {
-            if (document.visibilityState === "hidden") releaseAll();
+            if (document.visibilityState === "hidden") interrupt();
         });
 
         return {
             setPlayer(value) {
                 if (!DIRECTIONS[value]) throw new Error("Unknown player: " + value);
+                if (player !== value) releasePointerHolds();
                 player = value;
             },
-            setSync(value) { sync = !!value; },
+            setSync(value) {
+                value = !!value;
+                if (sync !== value) releasePointerHolds();
+                sync = value;
+            },
             releaseAll,
             tap(code) { release(press(code, null, "api")); },
             destroy() {
