@@ -29,11 +29,79 @@ const STICK_THRESHOLD: f32 = 0.5;
 /// count as a click.
 const CLICK_SLOP: f32 = 30.0;
 
-/// Number of input sources: [0]=arrows, [1]=WASD, [2]=gamepad0, [3]=gamepad1.
-const NUM_SOURCES: usize = 4;
+/// [0]=arrows, [1]=WASD, [2..4]=gamepads, [4..6]=touch heroes.
+const NUM_SOURCES: usize = 6;
 
 const ARROW_SYNC: KeyCode = KeyCode::RightShift;
 const WASD_SYNC: KeyCode = KeyCode::LeftShift;
+
+/// Shared with js/touch-controls.js. Touch has its own held state and fresh
+/// edges: it never impersonates or releases a physical keyboard key.
+#[derive(Clone, Copy, Default)]
+struct TouchInput {
+    down: u32,
+    pressed: u32,
+}
+
+const TOUCH_WAIT: u32 = 1 << 10;
+const TOUCH_UNDO: u32 = 1 << 11;
+const TOUCH_RESTART: u32 = 1 << 12;
+const TOUCH_EXIT: u32 = 1 << 13;
+const TOUCH_CONFIRM: u32 = 1 << 14;
+
+impl TouchInput {
+    fn from_snapshot(snapshot: u32) -> Self {
+        Self {
+            down: snapshot & 0x7fff,
+            pressed: (snapshot >> 16) & 0x7fff,
+        }
+    }
+
+    fn down(self, mask: u32) -> bool {
+        self.down & mask != 0
+    }
+
+    fn pressed(self, mask: u32) -> bool {
+        self.pressed & mask != 0
+    }
+
+    fn direction_mask(player: Player, dir: Dir4) -> u32 {
+        let offset = if player == Player::Player1 { 0 } else { 4 };
+        1 << (offset
+            + match dir {
+                Dir4::North => 0,
+                Dir4::South => 1,
+                Dir4::West => 2,
+                Dir4::East => 3,
+            })
+    }
+
+    fn synced(self, player: Player) -> bool {
+        self.down(if player == Player::Player1 {
+            1 << 8
+        } else {
+            1 << 9
+        })
+    }
+
+    #[must_use]
+    fn poll_direction(
+        self,
+        player: Player,
+        held: &mut EnumMap<Dir4, f32>,
+        dt: f32,
+    ) -> Option<PlayerInput> {
+        poll_direction(held, dt, |dir| {
+            let mask = Self::direction_mask(player, dir);
+            (self.down(mask), self.pressed(mask))
+        })
+        .map(|(action, fresh)| PlayerInput {
+            action,
+            synced: self.synced(player),
+            fresh,
+        })
+    }
+}
 
 pub(crate) fn arrow_key(dir: Dir4) -> KeyCode {
     match dir {
@@ -142,8 +210,9 @@ pub(crate) struct PointerInput {
 
 /// Tracks held state for input repeat, and mouse presses.
 pub(crate) struct InputState {
-    /// Per-source directional held timers: [arrows, WASD, gamepad0, gamepad1][dir].
+    /// Per-source directional held timers; physical and touch sources are separate.
     held_move: [EnumMap<Dir4, f32>; NUM_SOURCES],
+    touch: TouchInput,
     /// Stall held timer for spacebar.
     held_stall_space: f32,
     /// Stall held timers per gamepad.
@@ -168,6 +237,7 @@ impl InputState {
     pub(crate) fn new() -> Self {
         Self {
             held_move: Default::default(),
+            touch: TouchInput::default(),
             held_stall_space: 0.0,
             held_stall_gp: EnumMap::default(),
             held_undo: 0.0,
@@ -206,8 +276,8 @@ impl InputState {
 
     /// Note which device was used this frame.
     pub(crate) fn track_device(&mut self, gamepad: &GamepadContext) {
-        // Browser key events also carry touch-dock actions. Its trusted-event
-        // tracker chooses keyboard/touch mode; keep the last real pad family.
+        // The browser chooses the instruction mode; keep the last real pad
+        // family for its matching glyphs. Mode never determines input ownership.
         #[cfg(not(target_arch = "wasm32"))]
         if get_last_key_pressed().is_some() || is_mouse_button_pressed(MouseButton::Left) {
             self.hints = InputHints::Keyboard;
@@ -226,6 +296,12 @@ impl InputState {
                 self.used_any = true;
             }
         }
+    }
+
+    /// Consume the browser's held state and fresh touch edges once per frame,
+    /// including frames blocked by a page overlay.
+    pub(crate) fn sample_touch_input(&mut self, snapshot: u32) {
+        self.touch = TouchInput::from_snapshot(snapshot);
     }
 
     /// Reset held timers, suppressing carried-over holds until release or a fresh press.
@@ -264,6 +340,7 @@ impl InputState {
 
         // Restart (R / LB / LT on any gamepad)
         if is_key_pressed(KeyCode::R)
+            || self.touch.pressed(TOUCH_RESTART)
             || any_gp_pressed_multi(
                 gamepad,
                 &[GamepadButton::LeftShoulder, GamepadButton::LeftTrigger],
@@ -274,16 +351,22 @@ impl InputState {
 
         // Undo with repeat (U / X / Y on any gamepad)
         let undo_down = is_key_down(KeyCode::U)
+            || self.touch.down(TOUCH_UNDO)
             || any_gp_down_multi(gamepad, &[GamepadButton::West, GamepadButton::North]);
         let undo_pressed = is_key_pressed(KeyCode::U)
+            || self.touch.pressed(TOUCH_UNDO)
             || any_gp_pressed_multi(gamepad, &[GamepadButton::West, GamepadButton::North]);
         if input_repeat(undo_down, undo_pressed, &mut self.held_undo, dt) {
             inputs.push(MetaInput::Undo);
         }
 
         // Per-player confirm with repeat: Space/Enter → both, gp0 → P1, gp1 → P2
-        let space_down = is_key_down(KeyCode::Space) || is_key_down(KeyCode::Enter);
-        let space_pressed = is_key_pressed(KeyCode::Space) || is_key_pressed(KeyCode::Enter);
+        let space_down = is_key_down(KeyCode::Space)
+            || is_key_down(KeyCode::Enter)
+            || self.touch.down(TOUCH_WAIT | TOUCH_CONFIRM);
+        let space_pressed = is_key_pressed(KeyCode::Space)
+            || is_key_pressed(KeyCode::Enter)
+            || self.touch.pressed(TOUCH_WAIT | TOUCH_CONFIRM);
         let confirm_sources: [(bool, bool, Player); 4] = [
             (space_down, space_pressed, Player::Player1),
             (space_down, space_pressed, Player::Player2),
@@ -321,7 +404,10 @@ impl InputState {
         }
 
         // Exit (Escape / Start on any gamepad)
-        if is_key_pressed(KeyCode::Escape) || any_gp_pressed(gamepad, GamepadButton::Start) {
+        if is_key_pressed(KeyCode::Escape)
+            || self.touch.pressed(TOUCH_EXIT)
+            || any_gp_pressed(gamepad, GamepadButton::Start)
+        {
             inputs.push(MetaInput::Exit);
         }
 
@@ -342,8 +428,7 @@ impl InputState {
         let controller_connected = gamepad
             .gamepad(Gamepad::Gamepad1.index())
             .is_some_and(|g| g.is_connected());
-        let (arrow_player, second) =
-            keyboard_players(player_count, controller_connected, self.hints(gamepad));
+        let (arrow_player, second) = keyboard_players(player_count, controller_connected);
 
         let mut result: EnumMap<Player, Option<PlayerInput>> = EnumMap::default();
 
@@ -367,10 +452,24 @@ impl InputState {
             });
         }
 
-        // Spacebar stalls both players (not synced)
+        // Each touch direction identifies its hero even with a controller
+        // connected. It cannot change ownership of a physical key already held.
+        for (source, player, target) in [
+            (4, Player::Player1, Player::Player1),
+            (5, Player::Player2, second),
+        ] {
+            if let Some(action) = self
+                .touch
+                .poll_direction(player, &mut self.held_move[source], dt)
+            {
+                result[target] = Some(action);
+            }
+        }
+
+        // Spacebar or touch Wait stalls both players (not synced).
         if let Some(fresh) = input_held(
-            is_key_down(KeyCode::Space),
-            is_key_pressed(KeyCode::Space),
+            is_key_down(KeyCode::Space) || self.touch.down(TOUCH_WAIT),
+            is_key_pressed(KeyCode::Space) || self.touch.pressed(TOUCH_WAIT),
             &mut self.held_stall_space,
             dt,
         ) {
@@ -433,13 +532,17 @@ impl InputState {
     pub(crate) fn poll_nav(&mut self, gamepad: &GamepadContext, dt: f32) -> Option<Dir4> {
         let mut result = None;
         for (dir, held) in self.held_nav.iter_mut() {
+            let touch_direction = TouchInput::direction_mask(Player::Player1, dir)
+                | TouchInput::direction_mask(Player::Player2, dir);
             let down = is_key_down(arrow_key(dir))
                 || is_key_down(wasd_key(dir))
+                || self.touch.down(touch_direction)
                 || (0..2).any(|i| {
                     gp_btn_down(gamepad, i, dpad_button(dir)) || stick_points(gamepad, i, dir)
                 });
             let pressed = is_key_pressed(arrow_key(dir))
                 || is_key_pressed(wasd_key(dir))
+                || self.touch.pressed(touch_direction)
                 || (0..2).any(|i| gp_btn_pressed(gamepad, i, dpad_button(dir)));
             if input_repeat_nav(down, pressed, held, dt) {
                 result = result.or(Some(dir));
@@ -474,18 +577,14 @@ impl InputState {
     }
 }
 
-/// The touch dock addresses heroes explicitly even with a controller connected.
-fn keyboard_players(
-    player_count: usize,
-    controller_connected: bool,
-    hints: InputHints,
-) -> (Player, Player) {
+/// Physical keyboard routing is independent of the displayed input prompts.
+fn keyboard_players(player_count: usize, controller_connected: bool) -> (Player, Player) {
     let second = if player_count < 2 {
         Player::Player1
     } else {
         Player::Player2
     };
-    let arrows = if controller_connected && hints != InputHints::Touch {
+    let arrows = if controller_connected {
         second
     } else {
         Player::Player1
@@ -507,9 +606,20 @@ fn poll_keys_dir(
     held_move: &mut EnumMap<Dir4, f32>,
     dt: f32,
 ) -> Option<(Action, bool)> {
+    poll_direction(held_move, dt, |dir| {
+        let key = key_for(dir);
+        (is_key_down(key), is_key_pressed(key))
+    })
+}
+
+#[must_use]
+fn poll_direction(
+    held_move: &mut EnumMap<Dir4, f32>,
+    dt: f32,
+    state: impl Fn(Dir4) -> (bool, bool),
+) -> Option<(Action, bool)> {
     for (dir, held) in held_move.iter_mut() {
-        let down = is_key_down(key_for(dir));
-        let pressed = is_key_pressed(key_for(dir));
+        let (down, pressed) = state(dir);
         if let Some(fresh) = input_held(down, pressed, held, dt) {
             return Some((Action::Move(dir), fresh));
         }
@@ -740,34 +850,92 @@ mod tests {
 
     #[test]
     fn touch_heroes_keep_their_identity_with_an_idle_controller_connected() {
+        let p1 = TouchInput::direction_mask(Player::Player1, Dir4::East);
+        let p2 = TouchInput::direction_mask(Player::Player2, Dir4::North);
+        let bits = p1 | p2 | (1 << 9);
+        let touch = TouchInput::from_snapshot(bits | (bits << 16));
+        let mut p1_held = EnumMap::default();
+        let mut p2_held = EnumMap::default();
+        let first = touch
+            .poll_direction(Player::Player1, &mut p1_held, 1.0 / 60.0)
+            .unwrap();
+        let second = touch
+            .poll_direction(Player::Player2, &mut p2_held, 1.0 / 60.0)
+            .unwrap();
+        assert_eq!(first.action, Action::Move(Dir4::East));
+        assert!(!first.synced);
+        assert!(first.fresh);
+        assert_eq!(second.action, Action::Move(Dir4::North));
+        assert!(second.synced);
+        assert!(second.fresh);
+        // A physical arrow still belongs to P2. Showing touch instructions
+        // cannot reassign it or merge its held state with the touch P1 source.
         assert_eq!(
-            keyboard_players(2, true, InputHints::Touch),
-            (Player::Player1, Player::Player2)
-        );
-        assert_eq!(
-            keyboard_players(2, false, InputHints::Touch),
-            (Player::Player1, Player::Player2)
+            keyboard_players(2, true),
+            (Player::Player2, Player::Player2)
         );
     }
 
     #[test]
     fn physical_keyboard_routing_and_solo_controls_keep_the_original_behavior() {
         assert_eq!(
-            keyboard_players(2, true, InputHints::Keyboard),
+            keyboard_players(2, true),
             (Player::Player2, Player::Player2)
         );
         assert_eq!(
-            keyboard_players(2, false, InputHints::Keyboard),
+            keyboard_players(2, false),
             (Player::Player1, Player::Player2)
         );
-        for hints in [InputHints::Keyboard, InputHints::Touch] {
-            for connected in [false, true] {
-                assert_eq!(
-                    keyboard_players(1, connected, hints),
-                    (Player::Player1, Player::Player1)
-                );
-            }
+        for connected in [false, true] {
+            assert_eq!(
+                keyboard_players(1, connected),
+                (Player::Player1, Player::Player1)
+            );
         }
+    }
+
+    #[test]
+    fn releasing_touch_does_not_release_a_held_physical_direction() {
+        let mut physical = EnumMap::default();
+        let mut touch_held = EnumMap::default();
+        let key = |dir| (dir == Dir4::East, false);
+        assert!(poll_direction(&mut physical, 0.1, key).is_none());
+        let bit = TouchInput::direction_mask(Player::Player1, Dir4::East);
+        let touch = TouchInput::from_snapshot(bit | (bit << 16));
+        assert!(
+            touch
+                .poll_direction(Player::Player1, &mut touch_held, 0.1)
+                .is_some()
+        );
+        assert!(
+            TouchInput::default()
+                .poll_direction(Player::Player1, &mut touch_held, 0.1)
+                .is_none()
+        );
+        assert_eq!(
+            poll_direction(&mut physical, 0.2, key),
+            Some((Action::Move(Dir4::East), false))
+        );
+    }
+
+    #[test]
+    fn blocked_touch_edges_are_consumed_but_a_new_press_survives_suppression() {
+        let bit = TouchInput::direction_mask(Player::Player1, Dir4::East);
+        let mut held = EnumMap::from_fn(|_| SUPPRESSED);
+        // The blocking frame consumed the initial edge and suppressed its hold.
+        assert!(
+            TouchInput::from_snapshot(bit)
+                .poll_direction(Player::Player1, &mut held, 1.0)
+                .is_none()
+        );
+        // A release and a fresh press may both occur between polls. The
+        // explicit edge survives even though the sampled held bit is unchanged.
+        let fresh = TouchInput::from_snapshot(bit | (bit << 16));
+        let action = fresh
+            .poll_direction(Player::Player1, &mut held, 1.0 / 60.0)
+            .unwrap();
+        assert_eq!(action.action, Action::Move(Dir4::East));
+        assert!(action.fresh);
     }
 
     /// How many navigation steps holding a direction for `seconds` gives.
