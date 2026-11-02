@@ -6,11 +6,9 @@
   const welcome = document.getElementById("welcome");
   const start = document.getElementById("start-game");
   const help = document.getElementById("help");
-  const note = document.getElementById("dock-note");
   const toast = document.getElementById("toast");
-  const syncButton = document.getElementById("sync");
+  const menuButton = document.querySelector('.topbar [data-code="Escape"]');
   const tipRoot = document.getElementById("level-tip");
-  let sync = false;
   let controlsVisible = true;
   let toastTimer;
   let ready = false;
@@ -35,6 +33,7 @@
   const controls = InfestationTouch.create({
     canvas,
     root: document.body,
+    onInterrupt() { dock.interrupt(); },
     onAction(action) {
       resumeAudio();
       if (ready) welcome.hidden = true;
@@ -44,74 +43,72 @@
       }
     }
   });
+  const dock = InfestationDock.create({
+    root: document.getElementById("controller"),
+    controls,
+    onPlayerChange() {
+      resumeAudio();
+      focusGame();
+      if (navigator.getGamepads?.()[0]?.connected) {
+        showToast("For touch control of both heroes, disconnect your controller.", 4500);
+      }
+    },
+    onSyncChange(enabled) {
+      resumeAudio();
+      if (enabled) showToast("Choose a direction for each hero to move together.", 3600);
+      focusGame();
+    }
+  });
   const tips = InfestationTips.create({
     root: tipRoot,
     onToggle(open) {
-      controls.releaseAll();
+      dock.interrupt();
       if (open) tipRoot.querySelector("[data-tip-card]").focus({ preventScroll: true });
       else focusGame();
     }
   });
   // Reading or scrolling a tip must not leave a held direction running.
-  tipRoot.addEventListener("pointerdown", () => controls.releaseAll());
+  tipRoot.addEventListener("pointerdown", () => dock.interrupt());
   function syncTipVisibility() {
     tips.setSuppressed(!engineTipVisible || help.open || !welcome.hidden
       || !controlsVisible || !ready || loadFailed);
   }
+  function syncPresentation() {
+    const interactive = ready && !loadFailed && !help.open && welcome.hidden
+      && document.visibilityState !== "hidden";
+    dock.setAvailable(interactive && controlsVisible);
+    menuButton.disabled = !interactive;
+    syncTipVisibility();
+  }
   function focusGame() { canvas.focus({ preventScroll: true }); }
-  function closeHelp() { help.close(); syncTipVisibility(); focusGame(); }
+  function closeHelp() { help.close(); syncPresentation(); focusGame(); }
   start.addEventListener("click", () => {
     resumeAudio();
     welcome.hidden = true;
-    syncTipVisibility();
+    syncPresentation();
     focusGame();
   });
   document.getElementById("show-help").addEventListener("click", () => {
-    controls.releaseAll();
     help.showModal();
-    syncTipVisibility();
+    syncPresentation();
   });
   document.getElementById("close-help").addEventListener("click", closeHelp);
   document.getElementById("help-done").addEventListener("click", closeHelp);
-  help.addEventListener("cancel", () => { controls.releaseAll(); });
-  help.addEventListener("close", syncTipVisibility);
+  help.addEventListener("cancel", () => { dock.interrupt(); });
+  help.addEventListener("close", syncPresentation);
+  document.addEventListener("visibilitychange", syncPresentation);
   document.getElementById("toggle-controls").addEventListener("click", event => {
-    controls.releaseAll();
     controlsVisible = !controlsVisible;
     app.classList.toggle("controls-hidden", !controlsVisible);
     event.currentTarget.setAttribute("aria-expanded", String(controlsVisible));
     event.currentTarget.setAttribute("aria-label", controlsVisible ? "Hide touch controls" : "Show touch controls");
-    syncTipVisibility();
-    focusGame();
-  });
-  document.querySelectorAll("[data-player]").forEach(button => {
-    button.addEventListener("click", () => {
-      controls.setPlayer(button.dataset.player);
-      document.querySelectorAll("[data-player]").forEach(other => {
-        const selected = other === button;
-        other.classList.toggle("selected", selected);
-        other.setAttribute("aria-pressed", String(selected));
-      });
-      note.textContent = sync ? "Queue a direction for each hero." : "In solo rooms, either button controls your hero.";
-      focusGame();
-      if (navigator.getGamepads?.()[0]?.connected) {
-        showToast("For touch control of both heroes, disconnect your controller.", 4500);
-      }
-    });
-  });
-  syncButton.addEventListener("click", () => {
-    sync = !sync;
-    controls.setSync(sync);
-    syncButton.setAttribute("aria-pressed", String(sync));
-    document.getElementById("sync-label").textContent = sync ? "Sync on" : "Sync off";
-    note.textContent = sync ? "Queue a direction for each hero." : "Tap to move. Think as long as you like.";
-    if (sync) showToast("Two heroes: choose a direction for each to move together.", 3600);
+    syncPresentation();
     focusGame();
   });
   const fullscreen = document.getElementById("fullscreen");
   if (!document.documentElement.requestFullscreen) fullscreen.hidden = true;
   fullscreen.addEventListener("click", async () => {
-    controls.releaseAll();
+    dock.interrupt();
     try {
       if (document.fullscreenElement) await document.exitFullscreen();
       else await document.documentElement.requestFullscreen();
@@ -126,20 +123,21 @@
   });
   canvas.addEventListener("pointerdown", () => { focusGame(); resumeAudio(); });
   new ResizeObserver(() => {
-    controls.releaseAll();
+    dock.interrupt();
     window.dispatchEvent(new Event("resize"));
   }).observe(canvas.parentElement);
   function showLoadFailure(message) {
     loadFailed = true;
     engineTipVisible = false;
     tips.clear();
+    syncPresentation();
     if (welcome.hidden) { showToast(message, 12000); return; }
     document.getElementById("start-label").textContent = "Game couldn’t start";
     document.getElementById("load-note").textContent = message;
     start.disabled = true;
   }
   canvas.addEventListener("webglcontextlost", () => {
-    controls.releaseAll();
+    dock.interrupt();
     showLoadFailure("The graphics context was lost. Reload the page to continue.");
   });
   canvas.addEventListener("webglcontextcreationerror", event => {
@@ -159,6 +157,11 @@
       // replacement is visible. Hide/show and readiness take effect next frame.
       importObject.env.infestation_touch_controls_visible = () =>
         Number(controlsVisible && ready && !loadFailed);
+      importObject.env.infestation_touch_state = (roomPtr, roomLen, screen, players, actions) => {
+        dock.update({ room: UTF8ToString(roomPtr, roomLen), screen, players, actions });
+      };
+      importObject.env.infestation_touch_selected_player = () => dock.selectedPlayer();
+      importObject.env.infestation_touch_input_epoch = () => dock.inputEpoch();
       importObject.env.infestation_touch_tip = (roomPtr, roomLen, textPtr, textLen, player, shown, visible) => {
         engineTipVisible = Boolean(visible);
         syncTipVisibility();
@@ -175,7 +178,8 @@
           ready = true;
           start.disabled = false;
           document.getElementById("start-label").textContent = "Tap to play";
-          document.getElementById("load-note").textContent = "Then press OK to begin. Sound starts with your tap.";
+          document.getElementById("load-note").textContent = "Sound starts with your tap. Then choose Play to begin.";
+          syncPresentation();
         }
         return count();
       };
@@ -184,5 +188,6 @@
   setTimeout(() => {
     if (!ready && !loadFailed) showLoadFailure("Loading is taking longer than expected. Reload if it doesn’t finish.");
   }, 45000);
+  syncPresentation();
   load(document.body.dataset.wasmPath);
 })();
