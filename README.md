@@ -2,13 +2,49 @@
 
 A top-down 2D grid-based turn-based puzzle game inspired by [DROD](https://drod.caravelgames.com/).
 
-Play the game at https://davidspies.github.io/infestation
+This fork adds touchscreen controls and a mobile layout to
+[David Spies's Infestation](https://github.com/davidspies/infestation). It keeps
+the original game, levels, artwork and audio, with changes to the web interface
+and the game's portrait HUD.
+
+Play the original upstream version at https://davidspies.github.io/infestation.
+Build and serve this fork locally, or publish a playable copy with
+[GitHub Pages](#publish-with-github-pages) using the instructions below.
 
 AI Disclaimer: This game uses entirely AI-generated artwork, music and sound effects.
 
+## Touchscreen support
+
+- A compact directional pad, Wait, OK, Undo and Restart, plus hero selection
+  and synchronized moves for two-hero rooms. The controls expand across phone
+  widths and move to a narrow side dock on short landscape screens.
+- In portrait gameplay, the touch dock replaces the duplicate instruction
+  panel, giving its space back to the puzzle. Room tips appear in a scrollable,
+  dismissible overlay; opening, closing or typing a tip does not resize or
+  reposition the board.
+- Direct taps on the game's menus and map, audio activation on a real gesture,
+  a controls toggle, and fullscreen where the browser supports it. Keyboard
+  controls remain available, and native builds retain their original HUD.
+
+See the [touchscreen guide](docs/TOUCHSCREEN.md) for controls, two-hero caveats,
+implementation details and device checks.
+
 ## Development
 
-- `./serve.sh` builds the web version and serves it at http://localhost:8080.
+Install Rust through [rustup](https://rustup.rs/) and Python 3, then run these
+commands from the repository root:
+
+```sh
+rustup target add wasm32-unknown-unknown
+./serve.sh
+```
+
+`./serve.sh` builds the web version and serves it at http://localhost:8080.
+For a phone on the same network, open port 8080 at the computer's local network
+address. The first build needs network access for dependencies and any missing
+fonts or JavaScript runtime files. Use an up-to-date Rust toolchain; the game
+uses the Rust 2024 edition.
+
 - `cargo run -r` runs the native version (from the repository root, where it
   finds `assets/music`). Pass a level name, e.g. `cargo run -r -- chase`, to
   start in that level (`?level=chase` on the web).
@@ -17,6 +53,43 @@ AI Disclaimer: This game uses entirely AI-generated artwork, music and sound eff
   them. Levels unlock the way the old hub levels gated them: you can walk
   through junctions and completed levels, and play any level you can reach.
 - `cargo run -r --bin editor <level>` opens the level editor.
+
+### Touchscreen tests
+
+The JavaScript tests use Node.js's built-in test runner and require no npm
+packages:
+
+```sh
+node --test tests/touch-controls.test.cjs tests/touch-tips.test.cjs
+```
+
+These cover input handling and room-tip state. Also test the served game on
+physical phones: the Node tests do not exercise WebGL rendering, browser audio,
+fullscreen or device-specific touch behavior. The web game requires a browser
+with WebAssembly and working WebGL graphics support.
+
+### Publish with GitHub Pages
+
+In the fork's **Settings → Pages → Build and deployment**, select **GitHub
+Actions** as the source. If GitHub has disabled workflows in the new fork,
+enable them from the **Actions** tab.
+
+The **Deploy to GitHub Pages** workflow runs on pushes to `master` and can also
+be started manually. It runs the touch-input and room-tip tests, builds the
+current game with `Cargo.lock`, packages the matching browser files and music,
+and publishes the result. Future pushes to `master` update the playable site.
+The historical comparison versions remain in Git history; this workflow
+publishes the current touchscreen game.
+
+After the first successful deployment, the Pages settings and workflow's
+`github-pages` environment show the live URL. For this repository, the default
+address is `https://perceptive-moose.github.io/infestation/`. The URL becomes
+available only after Pages has been enabled and a deployment has succeeded.
+
+See GitHub's [publishing source instructions](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site)
+for the one-time repository setting. The workflow uses GitHub's automatic
+token once Pages is configured; no personal access token needs to be added as
+a repository secret.
 
 ### Generated assets
 

@@ -12,13 +12,20 @@ permissions:
 
 concurrency:
   group: "pages"
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
+  test:
+    uses: ./.github/workflows/touch-tests.yml
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -26,61 +33,29 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - name: Build WASM
-        run: cargo build --target wasm32-unknown-unknown --release
-
-      # Two snapshots for before/after comparisons, served at /before/ and
-      # /after/ but not linked from the game: the original, and the
-      # overhaul exactly as first committed, before any follow-up fixes.
-      # Each version's build.rs downloads its own fonts and JS.
-      - name: Check out the before version
-        uses: actions/checkout@v4
-        with:
-          ref: bb566d6ef7b127dbb2696de0bb07dd1689e7d0e9
-          path: before
-
-      - name: Build the before version
-        working-directory: before
-        run: cargo build --target wasm32-unknown-unknown --release
-
-      - name: Check out the after version
-        uses: actions/checkout@v4
-        with:
-          ref: 6d90c2dbf8c1961f0960f6526dd0e18e87e97492
-          path: after
-
-      - name: Build the after version
-        working-directory: after
-        run: cargo build --target wasm32-unknown-unknown --release
+        run: cargo build --locked --target wasm32-unknown-unknown --release -p infestation --bin infestation
 
       - name: Prepare deployment
         run: |
-          # The overhauled game embeds its sprites, textures, sound effects
-          # and levels in the wasm; music streams in (MP3 on the web, which
-          # every browser decodes).
-          package() {
-            mkdir -p "$2/assets/music"
-            cp -r "$1/index.html" "$1/js" "$2/"
-            cp "$1"/assets/music/*.mp3 "$2/assets/music/"
-            cp "$1/target/wasm32-unknown-unknown/release/infestation.wasm" "$2/"
-          }
-          package . dist
-          package after dist/after
-          # Phones and tablets get a notice instead of the game, on /after/
-          # too: its page (not its game) gains the check.
-          cp js/desktop-only.js dist/after/js/
-          sed -i 's|<script>load(|<script src="js/desktop-only.js"></script><script>loadIfSupported(|' \
-            dist/after/index.html
-          grep -q 'loadIfSupported(' dist/after/index.html
-          # The original loads its assets at runtime.
-          mkdir -p dist/before
-          cp -r before/index.html before/js before/assets dist/before/
-          cp before/target/wasm32-unknown-unknown/release/infestation.wasm dist/before/
-          # Each page loads its wasm from the same directory once deployed.
+          # Sprites, textures, fonts, sound effects and levels are embedded
+          # in the WASM. Music streams from these relative MP3 paths.
+          mkdir -p dist/assets/music
+          cp index.html touch.css dist/
+          cp -r js dist/
+          cp assets/music/*.mp3 dist/assets/music/
+          cp target/wasm32-unknown-unknown/release/infestation.wasm dist/
           sed -i 's|target/wasm32-unknown-unknown/release/||' \
-            dist/index.html dist/after/index.html dist/before/index.html
+            dist/index.html
+          test -s dist/infestation.wasm
+          test -s dist/js/gl.js
+          test -s dist/js/sapp_jsutils.js
+          test -s dist/js/audio.js
+          test -s dist/js/touch-controls.js
+          test -s dist/js/touch-shell.js
+          test -s dist/js/touch-tips.js
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: dist
 
