@@ -5,7 +5,7 @@ use macroquad::prelude::*;
 use crate::atlas::SpriteId;
 use crate::audio::Sfx;
 use crate::direction::Dir4;
-use crate::input::MetaInput;
+use crate::input::{MetaInput, PointerEvent};
 use crate::render::palette::{GOLD, TEXT, TEXT_DIM, rgb};
 use crate::render::shapes::{faded, rounded_rect, rounded_rect_outline};
 use crate::render::text::{self, Align};
@@ -28,6 +28,12 @@ pub(crate) enum MenuItem {
     Quit,
 }
 
+impl MenuItem {
+    fn is_slider(self) -> bool {
+        matches!(self, Self::Music | Self::Sound | Self::Shake)
+    }
+}
+
 /// What the app should do after a menu choice.
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub(crate) enum MenuChoice {
@@ -40,10 +46,97 @@ pub(crate) enum MenuChoice {
     Quit,
 }
 
+/// One geometry calculation serves painting, hit testing and focus scrolling.
+struct MenuLayout {
+    s: f32,
+    card: Rect,
+    viewport: Rect,
+    rows: Vec<Rect>,
+    scroll: f32,
+    max_scroll: f32,
+}
+
+impl MenuLayout {
+    fn new(width: f32, height: f32, scale: f32, count: usize, time: f32, scroll: f32) -> Self {
+        // The game can use a tiny scale beside the landscape dock. Menu rows
+        // keep usable text and touch targets instead of inheriting that scale.
+        let s = scale.max(0.85);
+        let margin = 8.0 * s;
+        let row_h = (52.0 * s).max(44.0);
+        let gap = 8.0 * s;
+        let content_h = count as f32 * (row_h + gap) - gap;
+        let w = (420.0 * s).min((width - 2.0 * margin).max(1.0));
+        let h = (106.0 * s + content_h).min((height - 2.0 * margin).max(1.0));
+        let appear = (time / 0.18).min(1.0);
+        let y = (height / 2.0 - h / 2.0 + (1.0 - appear) * 24.0 * s)
+            .clamp(margin, (height - h - margin).max(margin));
+        let card = Rect::new((width - w) / 2.0, y, w, h);
+        let viewport = Rect::new(
+            card.x + 20.0 * s,
+            card.y + 86.0 * s,
+            (card.w - 40.0 * s).max(1.0),
+            (card.h - 106.0 * s).max(0.0),
+        );
+        let max_scroll = (content_h - viewport.h).max(0.0);
+        let scroll = scroll.clamp(0.0, max_scroll);
+        let row_w = viewport.w - if max_scroll > 0.0 { 12.0 * s } else { 0.0 };
+        let rows = (0..count)
+            .map(|i| {
+                Rect::new(
+                    viewport.x,
+                    viewport.y + i as f32 * (row_h + gap) - scroll,
+                    row_w,
+                    row_h,
+                )
+            })
+            .collect();
+        Self {
+            s,
+            card,
+            viewport,
+            rows,
+            scroll,
+            max_scroll,
+        }
+    }
+
+    fn row_at(&self, point: Vec2) -> Option<usize> {
+        self.viewport
+            .contains(point)
+            .then(|| self.rows.iter().position(|row| row.contains(point)))
+            .flatten()
+    }
+}
+
+#[derive(Clone, Copy)]
+enum MenuGesture {
+    Idle,
+    Slider {
+        index: usize,
+        track: Rect,
+    },
+    Scroll {
+        start: Vec2,
+        initial_scroll: f32,
+        moved: bool,
+    },
+    /// Ignore a release belonging to an interrupted gesture.
+    Cancelled,
+}
+
+#[derive(Debug, PartialEq)]
+enum MenuPointerAction {
+    SetSlider { index: usize, value: f32 },
+    Choose(usize),
+    Close,
+}
+
 pub(crate) struct Menu {
     items: Vec<MenuItem>,
     focus: usize,
     time: f32,
+    scroll: f32,
+    gesture: MenuGesture,
 }
 
 impl Menu {
@@ -53,13 +146,8 @@ impl Menu {
         if in_level {
             items.extend([MenuItem::Restart, MenuItem::WorldMap]);
         }
-        items.extend([
-            MenuItem::Music,
-            MenuItem::Sound,
-            MenuItem::Shake,
-            MenuItem::Export,
-            MenuItem::Import,
-        ]);
+        items.extend([MenuItem::Music, MenuItem::Sound, MenuItem::Shake]);
+        items.extend([MenuItem::Export, MenuItem::Import]);
         if !in_level {
             items.push(MenuItem::Title);
         }
@@ -70,48 +158,153 @@ impl Menu {
             items,
             focus: 0,
             time: 0.0,
+            scroll: 0.0,
+            gesture: MenuGesture::Cancelled,
         }
     }
 
-    fn rows(&self, layout: &ScreenLayout) -> (Rect, Vec<Rect>) {
-        let s = layout.s;
-        let row_h = 52.0 * s;
-        let gap = 8.0 * s;
-        let w = (420.0 * s).min(screen_width() - 24.0 * s);
-        let h = 96.0 * s + self.items.len() as f32 * (row_h + gap) + 14.0 * s;
-        let card = Rect::new(
-            screen_width() / 2.0 - w / 2.0,
-            (screen_height() / 2.0 - h / 2.0).max(8.0 * s),
-            w,
-            h,
-        );
-        let rows = (0..self.items.len())
-            .map(|i| {
-                Rect::new(
-                    card.x + 20.0 * s,
-                    card.y + 86.0 * s + i as f32 * (row_h + gap),
-                    card.w - 40.0 * s,
-                    row_h,
-                )
-            })
-            .collect();
-        (card, rows)
+    fn layout(&self, layout: &ScreenLayout) -> MenuLayout {
+        MenuLayout::new(
+            screen_width(),
+            screen_height(),
+            layout.s,
+            self.items.len(),
+            self.time,
+            self.scroll,
+        )
     }
 
-    fn adjust(&self, item: MenuItem, delta: f32, ctx: &mut Ctx) {
-        let value = match item {
+    /// A new pointer down starts a new gesture; an old release cannot choose a row.
+    pub(crate) fn cancel_pointer_input(&mut self) {
+        self.gesture = MenuGesture::Cancelled;
+    }
+
+    fn reveal_focus(&mut self, layout: &MenuLayout) {
+        let row = layout.rows[self.focus];
+        let delta = if row.y < layout.viewport.y {
+            row.y - layout.viewport.y
+        } else if row.bottom() > layout.viewport.bottom() {
+            row.bottom() - layout.viewport.bottom()
+        } else {
+            0.0
+        };
+        self.scroll = (layout.scroll + delta).clamp(0.0, layout.max_scroll);
+    }
+
+    /// The row chosen on pointer down owns a slider drag through its release.
+    /// A swipe elsewhere scrolls the list, and never activates its ending row.
+    #[must_use]
+    fn pointer_action(
+        &mut self,
+        event: &PointerEvent,
+        layout: &MenuLayout,
+    ) -> Option<MenuPointerAction> {
+        match *event {
+            PointerEvent::Down(point) => {
+                self.gesture = MenuGesture::Idle;
+                if let Some(index) = layout.row_at(point) {
+                    let track = slider_rect(layout.rows[index], layout.s);
+                    if self.items[index].is_slider() && slider_hit_rect(track).contains(point) {
+                        self.focus = index;
+                        self.gesture = MenuGesture::Slider { index, track };
+                        return Some(MenuPointerAction::SetSlider {
+                            index,
+                            value: slider_position(track, point.x),
+                        });
+                    }
+                }
+                if layout.viewport.contains(point) {
+                    self.gesture = MenuGesture::Scroll {
+                        start: point,
+                        initial_scroll: layout.scroll,
+                        moved: false,
+                    };
+                }
+            }
+            PointerEvent::Moved(point) => match &mut self.gesture {
+                MenuGesture::Slider { index, track } => {
+                    return Some(MenuPointerAction::SetSlider {
+                        index: *index,
+                        value: slider_position(*track, point.x),
+                    });
+                }
+                MenuGesture::Scroll {
+                    start,
+                    initial_scroll,
+                    moved,
+                } => {
+                    *moved |= start.distance(point) > 6.0;
+                    if *moved {
+                        self.scroll =
+                            (*initial_scroll + start.y - point.y).clamp(0.0, layout.max_scroll);
+                    }
+                }
+                MenuGesture::Idle | MenuGesture::Cancelled => {}
+            },
+            PointerEvent::Up { end, .. } => {
+                let gesture = std::mem::replace(&mut self.gesture, MenuGesture::Idle);
+                match gesture {
+                    MenuGesture::Slider { index, track } => {
+                        return Some(MenuPointerAction::SetSlider {
+                            index,
+                            value: slider_position(track, end.x),
+                        });
+                    }
+                    MenuGesture::Scroll { moved, start, .. }
+                        if moved || start.distance(end) > 6.0 =>
+                    {
+                        return None;
+                    }
+                    MenuGesture::Cancelled => return None,
+                    _ => {}
+                }
+                // Keep ordinary click behavior, but never turn a long swipe
+                // into a click just because it returned near its starting point.
+                if event.click().is_some() {
+                    if !layout.card.contains(end) {
+                        return Some(MenuPointerAction::Close);
+                    }
+                    if let Some(index) = layout.row_at(end) {
+                        // A slider label can be used as a safe scrolling handle;
+                        // only its bar changes the value through pointer input.
+                        if !self.items[index].is_slider() {
+                            self.focus = index;
+                            return Some(MenuPointerAction::Choose(index));
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn set_slider(&self, item: MenuItem, value: f32, ctx: &mut Ctx) {
+        let current = match item {
             MenuItem::Music => &mut ctx.settings.music_volume,
             MenuItem::Sound => &mut ctx.settings.sfx_volume,
             MenuItem::Shake => &mut ctx.settings.screen_shake,
             _ => return,
         };
-        *value = ((*value + delta) * 10.0).round().clamp(0.0, 10.0) / 10.0;
+        let value = (value * 10.0).round().clamp(0.0, 10.0) / 10.0;
+        if *current == value {
+            return;
+        }
+        *current = value;
         ctx.audio.music_volume = ctx.settings.music_volume;
         ctx.audio.sfx_volume = ctx.settings.sfx_volume;
+        // Dragging only saves/plays feedback when crossing into a new step,
+        // rather than on every frame spent holding the bar.
         ctx.settings.save();
         ctx.audio.play(Sfx::UiMove);
     }
 
+    fn adjust(&self, item: MenuItem, delta: f32, ctx: &mut Ctx) {
+        if let Some(current) = slider_value(item, ctx.settings) {
+            self.set_slider(item, current + delta, ctx);
+        }
+    }
+
+    #[must_use]
     fn choose(&self, item: MenuItem, ctx: &mut Ctx) -> Option<MenuChoice> {
         let choice = match item {
             MenuItem::Resume => MenuChoice::Resume,
@@ -123,7 +316,7 @@ impl Menu {
             MenuItem::Quit => MenuChoice::Quit,
             MenuItem::Music | MenuItem::Sound | MenuItem::Shake => {
                 let on = slider_value(item, ctx.settings).expect("a slider") > 0.0;
-                self.adjust(item, if on { -1.0 } else { 1.0 }, ctx);
+                self.set_slider(item, if on { 0.0 } else { 1.0 }, ctx);
                 return None;
             }
         };
@@ -135,6 +328,7 @@ impl Menu {
         Some(choice)
     }
 
+    #[must_use]
     pub(crate) fn update(
         &mut self,
         ctx: &mut Ctx,
@@ -142,6 +336,14 @@ impl Menu {
         layout: &ScreenLayout,
     ) -> Option<MenuChoice> {
         self.time += input.dt;
+        if input.has(MetaInput::Exit) || input.has(MetaInput::Undo) {
+            self.cancel_pointer_input();
+            ctx.audio.play(Sfx::UiBack);
+            return Some(MenuChoice::Resume);
+        }
+        if input.nav.is_some() || input.confirmed() {
+            self.cancel_pointer_input();
+        }
         match input.nav {
             Some(Dir4::North) => {
                 self.focus = (self.focus + self.items.len() - 1) % self.items.len();
@@ -155,35 +357,33 @@ impl Menu {
             Some(Dir4::East) => self.adjust(self.items[self.focus], 0.1, ctx),
             None => {}
         }
-        if input.has(MetaInput::Exit) || input.has(MetaInput::Undo) {
-            ctx.audio.play(Sfx::UiBack);
-            return Some(MenuChoice::Resume);
+        if input.nav.is_some() {
+            self.reveal_focus(&self.layout(layout));
         }
         if input.confirmed() {
+            self.reveal_focus(&self.layout(layout));
             return self.choose(self.items[self.focus], ctx);
         }
-        let (card, rows) = self.rows(layout);
-        for click in input.clicks() {
-            if !card.contains(click) {
-                ctx.audio.play(Sfx::UiBack);
-                return Some(MenuChoice::Resume);
-            }
-            for (i, row) in rows.iter().enumerate() {
-                if !row.contains(click) {
-                    continue;
+        let geometry = self.layout(layout);
+        self.scroll = geometry.scroll;
+        if input.wheel != 0.0 {
+            self.cancel_pointer_input();
+            self.scroll =
+                (self.scroll - input.wheel * 40.0 * geometry.s).clamp(0.0, geometry.max_scroll);
+        }
+        for event in &input.pointer {
+            match self.pointer_action(event, &self.layout(layout)) {
+                Some(MenuPointerAction::SetSlider { index, value }) => {
+                    self.set_slider(self.items[index], value, ctx)
                 }
-                self.focus = i;
-                let item = self.items[i];
-                if let Some(current) = slider_value(item, ctx.settings) {
-                    let slider = slider_rect(*row, layout.s);
-                    // Eleven equal zones, so 0 and 10 are as easy to hit
-                    // as the steps between.
-                    let step = ((click.x - slider.x) / slider.w * 11.0).floor();
-                    let value = step.clamp(0.0, 10.0) / 10.0;
-                    self.adjust(item, value - current, ctx);
-                    return None;
+                Some(MenuPointerAction::Choose(index)) => {
+                    return self.choose(self.items[index], ctx);
                 }
-                return self.choose(item, ctx);
+                Some(MenuPointerAction::Close) => {
+                    ctx.audio.play(Sfx::UiBack);
+                    return Some(MenuChoice::Resume);
+                }
+                None => {}
             }
         }
         None
@@ -191,7 +391,8 @@ impl Menu {
 
     pub(crate) fn draw(&self, ctx: &Ctx, layout: &ScreenLayout) {
         let sprites = ctx.sprites;
-        let s = layout.s;
+        let geometry = self.layout(layout);
+        let s = geometry.s;
         let appear = (self.time / 0.18).min(1.0);
         draw_rectangle(
             0.0,
@@ -200,19 +401,31 @@ impl Menu {
             screen_height(),
             Color::new(0.02, 0.01, 0.04, 0.6 * appear),
         );
-        let (card, rows) = self.rows(layout);
-        let card = Rect::new(card.x, card.y + (1.0 - appear) * 24.0 * s, card.w, card.h);
-        ui::panel(card, s);
+        ui::panel(geometry.card, s);
         text::draw_title(
             sprites,
             "Paused",
-            vec2(card.center().x, card.y + 46.0 * s),
+            vec2(geometry.card.center().x, geometry.card.y + 46.0 * s),
             40.0 * s,
             GOLD,
             crate::render::palette::INK,
         );
-        for (i, (item, row)) in self.items.iter().zip(rows).enumerate() {
-            let row = Rect::new(row.x, row.y + (1.0 - appear) * 24.0 * s, row.w, row.h);
+        // Scissors use framebuffer pixels; menu geometry uses logical pixels.
+        let dpi = screen_dpi_scale();
+        let clip = geometry.viewport;
+        unsafe {
+            get_internal_gl().quad_gl.scissor(Some((
+                (clip.x * dpi).floor() as i32,
+                (clip.y * dpi).floor() as i32,
+                (clip.w * dpi).ceil() as i32,
+                (clip.h * dpi).ceil() as i32,
+            )));
+        }
+        for (i, (item, row)) in self.items.iter().zip(&geometry.rows).enumerate() {
+            let row = *row;
+            if row.bottom() < clip.y || row.y > clip.bottom() {
+                continue;
+            }
             let focused = i == self.focus;
             let (icon, label) = match item {
                 MenuItem::Resume => (SpriteId::IconPlay, "Resume"),
@@ -245,16 +458,22 @@ impl Menu {
                         26.0 * s,
                         if focused { GOLD } else { TEXT },
                     );
+                    let track = slider_rect(row, s);
+                    let label_x = row.x + 50.0 * s;
+                    let label_size = 21.0 * s;
+                    let label_width = text::width(sprites, label, Face::Display, label_size);
+                    let label_size = label_size
+                        * ((slider_hit_rect(track).x - label_x - 6.0 * s) / label_width).min(1.0);
                     text::draw_aligned(
                         sprites,
                         label,
-                        vec2(row.x + 50.0 * s, row.center().y),
+                        vec2(label_x, row.center().y),
                         Align::Left,
                         Face::Display,
-                        21.0 * s,
+                        label_size,
                         TEXT,
                     );
-                    ui::slider(slider_rect(row, s), value, focused, s);
+                    ui::slider(track, value, focused, s);
                     text::draw_aligned(
                         sprites,
                         &format!("{}", (value * 10.0).round() as i32),
@@ -281,12 +500,39 @@ impl Menu {
                 .draw(sprites, s),
             }
         }
+        unsafe {
+            get_internal_gl().quad_gl.scissor(None);
+        }
+        if geometry.max_scroll > 0.0 && clip.h > 0.0 {
+            let x = clip.right() - 4.0 * s;
+            rounded_rect(
+                Rect::new(x, clip.y, 4.0 * s, clip.h),
+                2.0 * s,
+                rgb(0x40364e),
+            );
+            let content_h = clip.h + geometry.max_scroll;
+            let thumb_h = (clip.h * clip.h / content_h).max(24.0 * s).min(clip.h);
+            let y = clip.y + (clip.h - thumb_h) * geometry.scroll / geometry.max_scroll;
+            rounded_rect(Rect::new(x, y, 4.0 * s, thumb_h), 2.0 * s, GOLD);
+        }
     }
 }
 
 fn slider_rect(row: Rect, s: f32) -> Rect {
     let x = row.x + row.w * 0.52;
-    Rect::new(x, row.y, row.right() - x - 46.0 * s, row.h)
+    Rect::new(x, row.y, (row.right() - x - 46.0 * s).max(1.0), row.h)
+}
+
+fn slider_hit_rect(track: Rect) -> Rect {
+    // The painted knob extends beyond each endpoint by this radius.
+    let radius = track.h * 0.36;
+    Rect::new(track.x - radius, track.y, track.w + 2.0 * radius, track.h)
+}
+
+fn slider_position(track: Rect, x: f32) -> f32 {
+    // Eleven equal zones keep the existing click-to-set steps, with endpoints
+    // just as easy to reach as intermediate values. A drag clamps at the ends.
+    (((x - track.x) / track.w * 11.0).floor()).clamp(0.0, 10.0) / 10.0
 }
 
 /// A dialog showing a code to copy (progress export or a solution).
@@ -438,5 +684,259 @@ fn slider_value(item: MenuItem, settings: &Settings) -> Option<f32> {
         MenuItem::Sound => Some(settings.sfx_volume),
         MenuItem::Shake => Some(settings.screen_shake),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn menu() -> Menu {
+        let mut menu = Menu::new(true);
+        menu.items = vec![
+            MenuItem::Resume,
+            MenuItem::Restart,
+            MenuItem::WorldMap,
+            MenuItem::Music,
+            MenuItem::Sound,
+            MenuItem::Shake,
+            MenuItem::Title,
+            MenuItem::Export,
+            MenuItem::Import,
+        ];
+        menu.time = 1.0;
+        menu
+    }
+
+    fn layout(menu: &Menu) -> MenuLayout {
+        MenuLayout::new(320.0, 445.0, 0.8, menu.items.len(), menu.time, menu.scroll)
+    }
+
+    #[test]
+    fn bounded_menu_keeps_touch_targets_on_small_phone_viewports() {
+        for (width, height, scale) in [
+            (320.0, 445.0, 0.8),
+            (393.0, 545.0, 0.9825),
+            (393.0, 495.0, 0.9825),
+            (468.0, 322.0, 0.42),
+            (296.0, 282.0, 0.42),
+        ] {
+            for time in [0.0, 0.09, 0.18, 1.0] {
+                let layout = MenuLayout::new(width, height, scale, 9, time, 0.0);
+                assert!(layout.card.x >= 0.0 && layout.card.right() <= width);
+                assert!(layout.card.y >= 0.0 && layout.card.bottom() <= height);
+                assert!(layout.viewport.y >= layout.card.y);
+                assert!(layout.viewport.bottom() <= layout.card.bottom());
+                assert!(layout.rows.iter().all(|row| row.h >= 44.0));
+                assert!(layout.max_scroll > 0.0);
+            }
+        }
+    }
+
+    #[test]
+    fn slider_drag_keeps_its_original_row_and_clamps_an_outside_release() {
+        let mut menu = menu();
+        let geometry = layout(&menu);
+        let track = slider_rect(geometry.rows[3], geometry.s);
+        assert_eq!(
+            menu.pointer_action(&PointerEvent::Down(track.center()), &geometry),
+            Some(MenuPointerAction::SetSlider {
+                index: 3,
+                value: 0.5
+            })
+        );
+        assert_eq!(
+            menu.pointer_action(
+                &PointerEvent::Moved(vec2(track.right() + 100.0, geometry.rows[4].center().y)),
+                &geometry
+            ),
+            Some(MenuPointerAction::SetSlider {
+                index: 3,
+                value: 1.0
+            })
+        );
+        assert_eq!(
+            menu.pointer_action(
+                &PointerEvent::Up {
+                    start: track.center(),
+                    end: vec2(-100.0, -100.0)
+                },
+                &geometry
+            ),
+            Some(MenuPointerAction::SetSlider {
+                index: 3,
+                value: 0.0
+            })
+        );
+        assert_eq!(
+            menu.pointer_action(&PointerEvent::Moved(track.center()), &geometry),
+            None
+        );
+        assert_eq!(menu.focus, 3);
+    }
+
+    #[test]
+    fn tapping_a_slider_keeps_the_clicked_step_on_release() {
+        let mut menu = menu();
+        let geometry = layout(&menu);
+        let track = slider_rect(geometry.rows[3], geometry.s);
+        let point = vec2(track.x + track.w * 0.25, track.center().y);
+        let expected = Some(MenuPointerAction::SetSlider {
+            index: 3,
+            value: 0.2,
+        });
+        assert_eq!(
+            menu.pointer_action(&PointerEvent::Down(point), &geometry),
+            expected
+        );
+        assert_eq!(
+            menu.pointer_action(
+                &PointerEvent::Up {
+                    start: point,
+                    end: point
+                },
+                &geometry
+            ),
+            expected
+        );
+    }
+
+    #[test]
+    fn endpoint_knobs_can_be_grabbed_outside_the_bar() {
+        let mut menu = menu();
+        let geometry = layout(&menu);
+        let track = slider_rect(geometry.rows[3], geometry.s);
+        for (x, value) in [
+            (track.x - track.h * 0.3, 0.0),
+            (track.right() + track.h * 0.3, 1.0),
+        ] {
+            let point = vec2(x, track.center().y);
+            assert_eq!(
+                menu.pointer_action(&PointerEvent::Down(point), &geometry),
+                Some(MenuPointerAction::SetSlider { index: 3, value })
+            );
+        }
+    }
+
+    #[test]
+    fn interrupting_a_drag_suppresses_its_release_but_accepts_a_new_gesture() {
+        let mut menu = menu();
+        let geometry = layout(&menu);
+        let track = slider_rect(geometry.rows[3], geometry.s);
+        assert!(
+            menu.pointer_action(&PointerEvent::Down(track.center()), &geometry)
+                .is_some()
+        );
+        menu.cancel_pointer_input();
+        assert_eq!(
+            menu.pointer_action(&PointerEvent::Moved(vec2(-100.0, -100.0)), &geometry),
+            None
+        );
+        assert_eq!(
+            menu.pointer_action(
+                &PointerEvent::Up {
+                    start: track.center(),
+                    end: geometry.rows[0].center()
+                },
+                &geometry
+            ),
+            None
+        );
+        let resume = geometry.rows[0].center();
+        assert_eq!(
+            menu.pointer_action(&PointerEvent::Down(resume), &geometry),
+            None
+        );
+        assert_eq!(
+            menu.pointer_action(
+                &PointerEvent::Up {
+                    start: resume,
+                    end: resume
+                },
+                &geometry
+            ),
+            Some(MenuPointerAction::Choose(0))
+        );
+    }
+
+    #[test]
+    fn swiping_the_list_reveals_hidden_settings_without_activating_a_row() {
+        let mut menu = menu();
+        let geometry = layout(&menu);
+        let start = vec2(
+            geometry.viewport.x + 10.0,
+            geometry.viewport.bottom() - 10.0,
+        );
+        assert_eq!(
+            menu.pointer_action(&PointerEvent::Down(start), &geometry),
+            None
+        );
+        let end = start - vec2(0.0, 240.0);
+        assert_eq!(
+            menu.pointer_action(&PointerEvent::Moved(end), &geometry),
+            None
+        );
+        assert!(menu.scroll > 0.0);
+        let scrolled = layout(&menu);
+        assert_eq!(
+            menu.pointer_action(&PointerEvent::Up { start, end }, &scrolled),
+            None
+        );
+        let hidden_item = scrolled.rows[6].center();
+        assert_eq!(scrolled.row_at(hidden_item), Some(6));
+        assert_eq!(
+            menu.pointer_action(&PointerEvent::Down(hidden_item), &scrolled),
+            None
+        );
+        assert_eq!(
+            menu.pointer_action(
+                &PointerEvent::Up {
+                    start: hidden_item,
+                    end: hidden_item
+                },
+                &scrolled
+            ),
+            Some(MenuPointerAction::Choose(6))
+        );
+    }
+
+    #[test]
+    fn a_fast_swipe_without_an_intermediate_move_does_not_click() {
+        let mut menu = menu();
+        let geometry = layout(&menu);
+        let start = geometry.rows[0].center();
+        assert_eq!(
+            menu.pointer_action(&PointerEvent::Down(start), &geometry),
+            None
+        );
+        assert_eq!(
+            menu.pointer_action(
+                &PointerEvent::Up {
+                    start,
+                    end: start + vec2(0.0, 15.0)
+                },
+                &geometry
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn focus_reveal_restores_a_row_scrolled_offscreen() {
+        let mut menu = menu();
+        menu.focus = 8;
+        menu.reveal_focus(&layout(&menu));
+        let bottom = layout(&menu);
+        assert!(bottom.rows[8].bottom() <= bottom.viewport.bottom() + 0.001);
+        menu.focus = 0;
+        menu.reveal_focus(&bottom);
+        let top = layout(&menu);
+        assert_eq!(top.scroll, 0.0);
+        assert!(top.rows[0].y >= top.viewport.y);
+        // The same reveal operation is used for left/right adjustment, even
+        // when the focus itself did not change after a touch/wheel scroll.
+        menu.scroll = bottom.max_scroll;
+        menu.reveal_focus(&layout(&menu));
+        assert_eq!(menu.scroll, 0.0);
     }
 }

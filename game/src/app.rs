@@ -232,6 +232,9 @@ impl App {
         if let Scene::Level(level) = &mut self.scene {
             level.cancel_pending_input();
         }
+        if let Some(Overlay::Menu(menu)) = &mut self.overlay {
+            menu.cancel_pointer_input();
+        }
     }
 
     fn touch_state(&self) -> TouchState<'static> {
