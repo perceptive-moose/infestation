@@ -24,6 +24,7 @@ pub(crate) enum MenuItem {
     Shake,
     TouchVisibility,
     TouchLayout,
+    TouchRepeat,
     Export,
     Import,
     Title,
@@ -32,7 +33,10 @@ pub(crate) enum MenuItem {
 
 impl MenuItem {
     fn is_slider(self) -> bool {
-        matches!(self, Self::Music | Self::Sound | Self::Shake)
+        matches!(
+            self,
+            Self::Music | Self::Sound | Self::Shake | Self::TouchRepeat
+        )
     }
 }
 
@@ -150,7 +154,11 @@ impl Menu {
         }
         items.extend([MenuItem::Music, MenuItem::Sound, MenuItem::Shake]);
         if cfg!(target_arch = "wasm32") {
-            items.extend([MenuItem::TouchVisibility, MenuItem::TouchLayout]);
+            items.extend([
+                MenuItem::TouchVisibility,
+                MenuItem::TouchLayout,
+                MenuItem::TouchRepeat,
+            ]);
         }
         items.extend([MenuItem::Export, MenuItem::Import]);
         if !in_level {
@@ -208,7 +216,7 @@ impl Menu {
             PointerEvent::Down(point) => {
                 self.gesture = MenuGesture::Idle;
                 if let Some(index) = layout.row_at(point) {
-                    let track = slider_rect(layout.rows[index], layout.s);
+                    let track = slider_rect(self.items[index], layout.rows[index], layout.s);
                     if self.items[index].is_slider() && slider_hit_rect(track).contains(point) {
                         self.focus = index;
                         self.gesture = MenuGesture::Slider { index, track };
@@ -284,17 +292,17 @@ impl Menu {
     }
 
     fn set_slider(&self, item: MenuItem, value: f32, ctx: &mut Ctx) {
-        let current = match item {
-            MenuItem::Music => &mut ctx.settings.music_volume,
-            MenuItem::Sound => &mut ctx.settings.sfx_volume,
-            MenuItem::Shake => &mut ctx.settings.screen_shake,
-            _ => return,
-        };
         let value = (value * 10.0).round().clamp(0.0, 10.0) / 10.0;
-        if *current == value {
+        if slider_value(item, ctx.settings) == Some(value) {
             return;
         }
-        *current = value;
+        match item {
+            MenuItem::Music => ctx.settings.music_volume = value,
+            MenuItem::Sound => ctx.settings.sfx_volume = value,
+            MenuItem::Shake => ctx.settings.screen_shake = value,
+            MenuItem::TouchRepeat => ctx.settings.set_touch_repeat_slider_value(value),
+            _ => return,
+        }
         ctx.audio.music_volume = ctx.settings.music_volume;
         ctx.audio.sfx_volume = ctx.settings.sfx_volume;
         // Dragging only saves/plays feedback when crossing into a new step,
@@ -347,6 +355,9 @@ impl Menu {
                 self.set_dpad_right(!ctx.settings.touch_dpad_right, ctx);
                 return None;
             }
+            // Unlike volume, a repeat delay has no on/off state. Adjust it
+            // with left/right or the slider; confirmation leaves it alone.
+            MenuItem::TouchRepeat => return None,
             MenuItem::Music | MenuItem::Sound | MenuItem::Shake => {
                 let on = slider_value(item, ctx.settings).expect("a slider") > 0.0;
                 self.set_slider(item, if on { 0.0 } else { 1.0 }, ctx);
@@ -483,6 +494,7 @@ impl Menu {
                         "D-pad: left"
                     },
                 ),
+                MenuItem::TouchRepeat => (SpriteId::IconGear, "D-pad delay"),
                 MenuItem::Export => (SpriteId::IconExport, "Export progress"),
                 MenuItem::Import => (SpriteId::IconImport, "Import progress"),
                 MenuItem::Title => (SpriteId::IconDoor, "Title screen"),
@@ -496,7 +508,8 @@ impl Menu {
                     if focused {
                         rounded_rect_outline(row, 12.0 * s, 2.0 * s, GOLD);
                     }
-                    let icon = if value == 0.0 && *item != MenuItem::Shake {
+                    let icon = if value == 0.0 && matches!(item, MenuItem::Music | MenuItem::Sound)
+                    {
                         SpriteId::IconMute
                     } else {
                         icon
@@ -507,7 +520,7 @@ impl Menu {
                         26.0 * s,
                         if focused { GOLD } else { TEXT },
                     );
-                    let track = slider_rect(row, s);
+                    let track = slider_rect(*item, row, s);
                     let label_x = row.x + 50.0 * s;
                     let label_size = 21.0 * s;
                     let label_width = text::width(sprites, label, Face::Display, label_size);
@@ -523,13 +536,26 @@ impl Menu {
                         TEXT,
                     );
                     ui::slider(track, value, focused, s);
+                    let value_label = if *item == MenuItem::TouchRepeat {
+                        format!("{:.2}s", ctx.settings.touch_repeat_delay_seconds())
+                    } else {
+                        format!("{}", (value * 10.0).round() as i32)
+                    };
+                    let value_size = if *item == MenuItem::TouchRepeat {
+                        let available =
+                            row.right() - 14.0 * s - slider_hit_rect(track).right() - 6.0 * s;
+                        let width = text::width(sprites, &value_label, Face::Display, 18.0 * s);
+                        18.0 * s * (available / width).min(1.0)
+                    } else {
+                        18.0 * s
+                    };
                     text::draw_aligned(
                         sprites,
-                        &format!("{}", (value * 10.0).round() as i32),
+                        &value_label,
                         vec2(row.right() - 14.0 * s, row.center().y),
                         Align::Right,
                         Face::Display,
-                        18.0 * s,
+                        value_size,
                         TEXT_DIM,
                     );
                 }
@@ -567,9 +593,20 @@ impl Menu {
     }
 }
 
-fn slider_rect(row: Rect, s: f32) -> Rect {
+fn slider_rect(item: MenuItem, row: Rect, s: f32) -> Rect {
     let x = row.x + row.w * 0.52;
-    Rect::new(x, row.y, (row.right() - x - 46.0 * s).max(1.0), row.h)
+    // The delay shows a real time value instead of a single slider step.
+    let value_space = if item == MenuItem::TouchRepeat {
+        84.0
+    } else {
+        46.0
+    };
+    Rect::new(
+        x,
+        row.y,
+        (row.right() - x - value_space * s).max(1.0),
+        row.h,
+    )
 }
 
 fn slider_hit_rect(track: Rect) -> Rect {
@@ -732,6 +769,7 @@ fn slider_value(item: MenuItem, settings: &Settings) -> Option<f32> {
         MenuItem::Music => Some(settings.music_volume),
         MenuItem::Sound => Some(settings.sfx_volume),
         MenuItem::Shake => Some(settings.screen_shake),
+        MenuItem::TouchRepeat => Some(settings.touch_repeat_slider_value()),
         _ => None,
     }
 }
@@ -757,6 +795,7 @@ mod tests {
             MenuItem::Shake,
             MenuItem::TouchVisibility,
             MenuItem::TouchLayout,
+            MenuItem::TouchRepeat,
             MenuItem::Export,
             MenuItem::Import,
         ];
@@ -790,10 +829,61 @@ mod tests {
     }
 
     #[test]
+    fn touch_repeat_setting_is_only_in_the_web_menu() {
+        for in_level in [false, true] {
+            assert_eq!(
+                Menu::new(in_level).items.contains(&MenuItem::TouchRepeat),
+                cfg!(target_arch = "wasm32")
+            );
+        }
+    }
+
+    #[test]
+    fn touch_repeat_slider_keeps_its_scrolled_row_and_clamps_an_outside_release() {
+        let mut menu = menu();
+        let index = menu
+            .items
+            .iter()
+            .position(|item| *item == MenuItem::TouchRepeat)
+            .unwrap();
+        menu.focus = index;
+        menu.reveal_focus(&layout(&menu));
+        let geometry = layout(&menu);
+        let track = slider_rect(MenuItem::TouchRepeat, geometry.rows[index], geometry.s);
+        let start = track.center();
+        assert_eq!(
+            menu.pointer_action(&PointerEvent::Down(start), &geometry),
+            Some(MenuPointerAction::SetSlider { index, value: 0.5 })
+        );
+        assert_eq!(
+            menu.pointer_action(
+                &PointerEvent::Moved(vec2(track.right() + 100.0, -100.0)),
+                &geometry
+            ),
+            Some(MenuPointerAction::SetSlider { index, value: 1.0 })
+        );
+        assert_eq!(
+            menu.pointer_action(
+                &PointerEvent::Up {
+                    start,
+                    end: vec2(-100.0, -100.0)
+                },
+                &geometry
+            ),
+            Some(MenuPointerAction::SetSlider { index, value: 0.0 })
+        );
+        assert_eq!(menu.focus, index);
+        assert_eq!(
+            slider_value(MenuItem::TouchRepeat, &Settings::default()),
+            Some(0.4)
+        );
+    }
+
+    #[test]
     fn slider_drag_keeps_its_original_row_and_clamps_an_outside_release() {
         let mut menu = menu();
         let geometry = layout(&menu);
-        let track = slider_rect(geometry.rows[3], geometry.s);
+        let track = slider_rect(MenuItem::Music, geometry.rows[3], geometry.s);
         assert_eq!(
             menu.pointer_action(&PointerEvent::Down(track.center()), &geometry),
             Some(MenuPointerAction::SetSlider {
@@ -835,7 +925,7 @@ mod tests {
     fn tapping_a_slider_keeps_the_clicked_step_on_release() {
         let mut menu = menu();
         let geometry = layout(&menu);
-        let track = slider_rect(geometry.rows[3], geometry.s);
+        let track = slider_rect(MenuItem::Music, geometry.rows[3], geometry.s);
         let point = vec2(track.x + track.w * 0.25, track.center().y);
         let expected = Some(MenuPointerAction::SetSlider {
             index: 3,
@@ -861,7 +951,7 @@ mod tests {
     fn endpoint_knobs_can_be_grabbed_outside_the_bar() {
         let mut menu = menu();
         let geometry = layout(&menu);
-        let track = slider_rect(geometry.rows[3], geometry.s);
+        let track = slider_rect(MenuItem::Music, geometry.rows[3], geometry.s);
         for (x, value) in [
             (track.x - track.h * 0.3, 0.0),
             (track.right() + track.h * 0.3, 1.0),
@@ -878,7 +968,7 @@ mod tests {
     fn interrupting_a_drag_suppresses_its_release_but_accepts_a_new_gesture() {
         let mut menu = menu();
         let geometry = layout(&menu);
-        let track = slider_rect(geometry.rows[3], geometry.s);
+        let track = slider_rect(MenuItem::Music, geometry.rows[3], geometry.s);
         assert!(
             menu.pointer_action(&PointerEvent::Down(track.center()), &geometry)
                 .is_some()

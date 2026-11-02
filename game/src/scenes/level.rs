@@ -343,23 +343,24 @@ impl LevelScene {
     fn queue_player_input(&mut self, input: &FrameInput, wait_clicked: bool) {
         let mut player_actions = input.players;
         if wait_clicked {
-            let stall = PlayerInput {
-                action: Action::Stall,
-                synced: false,
-                fresh: true,
-            };
-            for (_, action) in player_actions.iter_mut() {
-                *action = action.or(Some(stall));
-            }
+            PlayerInput::add_wait(&mut player_actions, true);
         }
         let player_count = self.game.state.player_count();
         for (player, player_action) in player_actions.iter().take(player_count) {
             if let Some(input) = player_action {
-                self.pending[player] = Some(PendingAction {
-                    action: input.action,
-                    synced: input.synced,
-                    fresh: input.fresh,
-                });
+                if input.ready {
+                    self.pending[player] = Some(PendingAction {
+                        action: input.action,
+                        synced: input.synced,
+                        fresh: input.fresh,
+                    });
+                } else if self.pending[player].is_some_and(|p| !p.fresh && p.action != input.action)
+                {
+                    self.pending[player] = None;
+                }
+                // Between touch repeat ticks, preserve the pending move while
+                // its direction is still held. It may be waiting for an
+                // animation or the second hero, but must not be re-enqueued.
             } else if self.pending[player].is_some_and(|p| !p.fresh) {
                 // Key was released — clear held-repeat pending so it doesn't
                 // fire as a stale buffered move after animation finishes.
@@ -571,6 +572,115 @@ mod tests {
         scene
     }
 
+    fn player_input(player: Player, action: Option<PlayerInput>) -> FrameInput {
+        let mut players = EnumMap::default();
+        players[player] = action;
+        FrameInput {
+            dt: 0.02,
+            meta: Vec::new(),
+            players,
+            nav: None,
+            pointer: Vec::new(),
+            wheel: 0.0,
+            any: action.is_some_and(|input| input.ready),
+        }
+    }
+
+    #[test]
+    fn touch_repeat_survives_the_second_hero_grace_period_without_requeueing() {
+        let mut scene = scene_from_csv("▲,.,.,.\n.,.,.,.\n△,.,.,.\n#,#,#,#\nR,.,.,.");
+        let repeated = PlayerInput {
+            action: Action::Move(Dir4::East),
+            synced: false,
+            fresh: false,
+            ready: true,
+        };
+        scene.queue_player_input(&player_input(Player::Player1, Some(repeated)), false);
+        scene.try_execute_pending();
+        assert!(scene.game.state.action_history.is_empty());
+
+        let waiting = player_input(
+            Player::Player1,
+            Some(PlayerInput {
+                ready: false,
+                ..repeated
+            }),
+        );
+        for _ in 0..20 {
+            scene.queue_player_input(&waiting, false);
+            scene.advance_pending_timer(waiting.dt);
+            let _ = scene.game.animate(waiting.dt);
+            scene.try_execute_pending();
+        }
+        assert_eq!(
+            scene.game.state.action_history,
+            vec![vec![Action::Move(Dir4::East), Action::Stall]]
+        );
+        assert!(scene.pending.values().all(Option::is_none));
+    }
+
+    #[test]
+    fn touch_repeat_waits_for_animation_but_release_cancels_the_buffered_repeat() {
+        for release in [false, true] {
+            let mut scene = scene_from_csv("▲,.,.,.,.\n#,#,#,#,#\nR,.,.,.,.");
+            scene.game.try_begin_actions(vec![Action::Move(Dir4::East)]);
+            assert!(scene.game.is_animating());
+            let repeated = PlayerInput {
+                action: Action::Move(Dir4::East),
+                synced: false,
+                fresh: false,
+                ready: true,
+            };
+            scene.queue_player_input(&player_input(Player::Player1, Some(repeated)), false);
+            let waiting = player_input(
+                Player::Player1,
+                (!release).then_some(PlayerInput {
+                    ready: false,
+                    ..repeated
+                }),
+            );
+            for _ in 0..30 {
+                scene.queue_player_input(&waiting, false);
+                scene.advance_pending_timer(waiting.dt);
+                let _ = scene.game.animate(waiting.dt);
+                scene.try_execute_pending();
+            }
+            assert_eq!(
+                scene.game.state.action_history.len(),
+                if release { 1 } else { 2 }
+            );
+            assert!(scene.pending.values().all(Option::is_none));
+        }
+    }
+
+    #[test]
+    fn touch_repeat_cooldown_keeps_a_fresh_synchronized_move_queued() {
+        let mut scene = scene_from_csv("▲,.,.\n.,.,.\n△,.,.");
+        let fresh = PlayerInput {
+            action: Action::Move(Dir4::East),
+            synced: true,
+            fresh: true,
+            ready: true,
+        };
+        scene.queue_player_input(&player_input(Player::Player1, Some(fresh)), false);
+        scene.queue_player_input(
+            &player_input(
+                Player::Player1,
+                Some(PlayerInput {
+                    fresh: false,
+                    ready: false,
+                    ..fresh
+                }),
+            ),
+            false,
+        );
+        scene.queue_player_input(&player_input(Player::Player1, None), false);
+        scene.advance_pending_timer(1.0);
+        scene.try_execute_pending();
+        assert!(scene.pending[Player::Player1].is_some_and(|input| input.fresh && input.synced));
+        assert!(scene.game.state.action_history.is_empty());
+    }
+
     #[test]
     fn undo_stays_enabled_after_restart() {
         let mut scene = scene_from_csv("▲,.,.");
@@ -612,6 +722,7 @@ mod tests {
             action: Action::Move(Dir4::East),
             synced: true,
             fresh: true,
+            ready: true,
         });
         scene.queue_player_input(&input, false);
         scene.advance_pending_timer(1.0);
@@ -633,6 +744,7 @@ mod tests {
             action: Action::Move(Dir4::East),
             synced: false,
             fresh: true,
+            ready: true,
         });
         scene.queue_player_input(&input, false);
         scene.advance_pending_timer(SYNC_GRACE_PERIOD);

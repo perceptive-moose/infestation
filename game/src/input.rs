@@ -90,16 +90,43 @@ impl TouchInput {
         player: Player,
         held: &mut EnumMap<Dir4, f32>,
         dt: f32,
+        repeat_delay: f32,
     ) -> Option<PlayerInput> {
-        poll_direction(held, dt, |dir| {
+        let mut result = None;
+        for (dir, held) in held.iter_mut() {
             let mask = Self::direction_mask(player, dir);
-            (self.down(mask), self.pressed(mask))
-        })
-        .map(|(action, fresh)| PlayerInput {
-            action,
-            synced: self.synced(player),
-            fresh,
-        })
+            let down = self.down(mask);
+            let fresh = self.pressed(mask);
+            update_input_suppression(down, fresh, held);
+            if !down {
+                *held = 0.0;
+                continue;
+            }
+            if *held == SUPPRESSED {
+                continue;
+            }
+            let ready = if fresh {
+                *held = 0.0;
+                true
+            } else {
+                *held += dt;
+                if *held >= repeat_delay {
+                    // A delayed frame emits only one repeat. Start a full new
+                    // interval instead of catching up with a burst of moves.
+                    *held = 0.0;
+                    true
+                } else {
+                    false
+                }
+            };
+            result = result.or(Some(PlayerInput {
+                action: Action::Move(dir),
+                synced: self.synced(player),
+                fresh,
+                ready,
+            }));
+        }
+        result
     }
 }
 
@@ -146,6 +173,26 @@ pub(crate) struct PlayerInput {
     pub(crate) synced: bool,
     /// Whether this was triggered by a fresh key press (not a held-repeat).
     pub(crate) fresh: bool,
+    /// A held direction remains present between touch repeat ticks. Only a
+    /// ready input may enqueue a new move; physical inputs are always ready.
+    pub(crate) ready: bool,
+}
+
+impl PlayerInput {
+    /// Wait applies to both heroes unless they have a move ready this frame.
+    pub(crate) fn add_wait(actions: &mut EnumMap<Player, Option<Self>>, fresh: bool) {
+        let stall = Self {
+            action: Action::Stall,
+            synced: false,
+            fresh,
+            ready: true,
+        };
+        for (_, action) in actions.iter_mut() {
+            if action.is_none_or(|input| !input.ready) {
+                *action = Some(stall);
+            }
+        }
+    }
 }
 
 /// A meta input action (not per-player).
@@ -424,6 +471,7 @@ impl InputState {
         gamepad: &GamepadContext,
         dt: f32,
         player_count: usize,
+        touch_repeat_delay: f32,
     ) -> EnumMap<Player, Option<PlayerInput>> {
         let controller_connected = gamepad
             .gamepad(Gamepad::Gamepad1.index())
@@ -439,6 +487,7 @@ impl InputState {
                 action,
                 synced,
                 fresh,
+                ready: true,
             });
         }
 
@@ -449,6 +498,7 @@ impl InputState {
                 action,
                 synced,
                 fresh,
+                ready: true,
             });
         }
 
@@ -458,11 +508,17 @@ impl InputState {
             (4, Player::Player1, Player::Player1),
             (5, Player::Player2, second),
         ] {
-            if let Some(action) = self
-                .touch
-                .poll_direction(player, &mut self.held_move[source], dt)
-            {
-                result[target] = Some(action);
+            if let Some(action) = self.touch.poll_direction(
+                player,
+                &mut self.held_move[source],
+                dt,
+                touch_repeat_delay,
+            ) {
+                // A touch hold waiting for its next repeat must not mask a
+                // ready physical key controlling the same hero.
+                if action.ready || result[target].is_none() {
+                    result[target] = Some(action);
+                }
             }
         }
 
@@ -473,13 +529,7 @@ impl InputState {
             &mut self.held_stall_space,
             dt,
         ) {
-            let stall = PlayerInput {
-                action: Action::Stall,
-                synced: false,
-                fresh,
-            };
-            result[Player::Player1] = result[Player::Player1].or(Some(stall));
-            result[Player::Player2] = result[Player::Player2].or(Some(stall));
+            PlayerInput::add_wait(&mut result, fresh);
         }
 
         // Source 2: Gamepad 1 → always P1
@@ -500,6 +550,7 @@ impl InputState {
                 action,
                 synced,
                 fresh,
+                ready: true,
             });
         }
 
@@ -521,6 +572,7 @@ impl InputState {
                 action,
                 synced,
                 fresh,
+                ready: true,
             });
         }
 
@@ -857,10 +909,10 @@ mod tests {
         let mut p1_held = EnumMap::default();
         let mut p2_held = EnumMap::default();
         let first = touch
-            .poll_direction(Player::Player1, &mut p1_held, 1.0 / 60.0)
+            .poll_direction(Player::Player1, &mut p1_held, 1.0 / 60.0, 0.3)
             .unwrap();
         let second = touch
-            .poll_direction(Player::Player2, &mut p2_held, 1.0 / 60.0)
+            .poll_direction(Player::Player2, &mut p2_held, 1.0 / 60.0, 0.3)
             .unwrap();
         assert_eq!(first.action, Action::Move(Dir4::East));
         assert!(!first.synced);
@@ -904,12 +956,12 @@ mod tests {
         let touch = TouchInput::from_snapshot(bit | (bit << 16));
         assert!(
             touch
-                .poll_direction(Player::Player1, &mut touch_held, 0.1)
+                .poll_direction(Player::Player1, &mut touch_held, 0.1, 0.3)
                 .is_some()
         );
         assert!(
             TouchInput::default()
-                .poll_direction(Player::Player1, &mut touch_held, 0.1)
+                .poll_direction(Player::Player1, &mut touch_held, 0.1, 0.3)
                 .is_none()
         );
         assert_eq!(
@@ -925,17 +977,110 @@ mod tests {
         // The blocking frame consumed the initial edge and suppressed its hold.
         assert!(
             TouchInput::from_snapshot(bit)
-                .poll_direction(Player::Player1, &mut held, 1.0)
+                .poll_direction(Player::Player1, &mut held, 1.0, 0.3)
                 .is_none()
         );
         // A release and a fresh press may both occur between polls. The
         // explicit edge survives even though the sampled held bit is unchanged.
         let fresh = TouchInput::from_snapshot(bit | (bit << 16));
         let action = fresh
-            .poll_direction(Player::Player1, &mut held, 1.0 / 60.0)
+            .poll_direction(Player::Player1, &mut held, 1.0 / 60.0, 0.3)
             .unwrap();
         assert_eq!(action.action, Action::Move(Dir4::East));
         assert!(action.fresh);
+        assert!(action.ready);
+        let waiting = TouchInput::from_snapshot(bit)
+            .poll_direction(Player::Player1, &mut held, 0.1, 0.3)
+            .unwrap();
+        assert!(!waiting.ready);
+        assert!(!waiting.fresh);
+    }
+
+    #[test]
+    fn touch_repeat_delay_applies_to_the_first_and_every_subsequent_repeat() {
+        let bit = TouchInput::direction_mask(Player::Player1, Dir4::East);
+        for delay in [0.1, 0.3, 0.6] {
+            let mut held = EnumMap::default();
+            let first = TouchInput::from_snapshot(bit | (bit << 16))
+                .poll_direction(Player::Player1, &mut held, 1.0 / 60.0, delay)
+                .unwrap();
+            assert!(first.ready && first.fresh);
+
+            let hold = TouchInput::from_snapshot(bit);
+            for _ in 0..3 {
+                let waiting = hold
+                    .poll_direction(Player::Player1, &mut held, delay - 0.01, delay)
+                    .unwrap();
+                assert!(!waiting.ready && !waiting.fresh);
+                let repeated = hold
+                    .poll_direction(Player::Player1, &mut held, 0.011, delay)
+                    .unwrap();
+                assert!(repeated.ready && !repeated.fresh);
+            }
+        }
+    }
+
+    #[test]
+    fn a_slow_frame_does_not_leave_touch_repeats_to_catch_up() {
+        let bit = TouchInput::direction_mask(Player::Player1, Dir4::East);
+        let mut held = EnumMap::default();
+        let hold = TouchInput::from_snapshot(bit);
+        assert!(
+            hold.poll_direction(Player::Player1, &mut held, 3.0, 0.3)
+                .unwrap()
+                .ready
+        );
+        assert!(
+            !hold
+                .poll_direction(Player::Player1, &mut held, 0.29, 0.3)
+                .unwrap()
+                .ready
+        );
+        assert!(
+            hold.poll_direction(Player::Player1, &mut held, 0.011, 0.3)
+                .unwrap()
+                .ready
+        );
+    }
+
+    #[test]
+    fn fresh_touch_taps_and_direction_changes_restart_the_repeat_delay() {
+        let east = TouchInput::direction_mask(Player::Player1, Dir4::East);
+        let north = TouchInput::direction_mask(Player::Player1, Dir4::North);
+        let mut held = EnumMap::default();
+        held[Dir4::East] = 0.29;
+
+        // A new edge resets the delay even if release and press were sampled
+        // together, and even if that frame itself took longer than the delay.
+        let fresh = TouchInput::from_snapshot(east | (east << 16))
+            .poll_direction(Player::Player1, &mut held, 1.0, 0.3)
+            .unwrap();
+        assert!(fresh.ready && fresh.fresh);
+        assert_eq!(held[Dir4::East], 0.0);
+
+        let changed = TouchInput::from_snapshot(north | (north << 16))
+            .poll_direction(Player::Player1, &mut held, 0.05, 0.3)
+            .unwrap();
+        assert_eq!(changed.action, Action::Move(Dir4::North));
+        assert!(changed.ready && changed.fresh);
+        assert!(held.values().all(|&time| time == 0.0));
+
+        assert!(
+            TouchInput::default()
+                .poll_direction(Player::Player1, &mut held, 0.05, 0.3)
+                .is_none()
+        );
+        assert!(held.values().all(|&time| time == 0.0));
+    }
+
+    #[test]
+    fn physical_movement_still_repeats_each_frame_after_its_original_delay() {
+        let mut held = 0.0;
+        assert_eq!(input_held(true, true, &mut held, 0.01), Some(true));
+        assert_eq!(input_held(true, false, &mut held, 0.18), None);
+        assert_eq!(input_held(true, false, &mut held, 0.02), Some(false));
+        assert_eq!(input_held(true, false, &mut held, 0.01), Some(false));
+        assert_eq!(input_held(true, false, &mut held, 0.01), Some(false));
     }
 
     /// How many navigation steps holding a direction for `seconds` gives.

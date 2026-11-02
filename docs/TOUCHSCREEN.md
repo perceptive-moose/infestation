@@ -19,7 +19,7 @@ message with recovery instructions, including if it happens after play begins.
 
 | Control | Action |
 | --- | --- |
-| Directional pad | Move the selected hero. Tap for a step or hold to repeat. You can slide between directions. The center is inactive. |
+| Directional pad | Move the selected hero. Tap for an immediate step or hold to repeat at the saved D-pad delay. You can slide between directions. The center is inactive. |
 | Wait | Pass a turn without moving. In two-hero rooms, it supplies a wait for both heroes. |
 | Play / Enter room / Close | Contextual confirmation on the title, map or code screen. During gameplay, Continue is on the win card. Settings and menu items accept direct taps without an extra Select button. |
 | Undo | Take back a move or a restart. |
@@ -85,6 +85,16 @@ Restart / Wait / Undo column. The hero selectors follow the D-pad in two-hero
 rooms. This preference is saved with the game's settings and restored on the
 next visit; existing saves keep the D-pad on the left until you change it.
 Swapping sides keeps the dock and game area the same size.
+
+Drag **D-pad delay** to adjust how long a held direction waits before its first
+repeat and between later repeats. The default is **0.30 seconds**, with values
+from **0.10 to 0.60 seconds** in 0.05-second steps. Move the slider right for
+slower repeats or left for faster repeats; the displayed value is the delay in
+seconds. A fresh tap or direction change still moves immediately. The setting
+is saved for the next visit and applies to touch D-pad movement in rooms.
+Keyboard/controller movement, Wait, Undo, and menu/map navigation keep their
+existing repeat timing. Turn animations can make movement slower than the
+selected repeat cadence.
 
 On smaller screens, swipe the settings list outside a slider to scroll to
 the remaining options. A mouse wheel also scrolls, and D-pad or keyboard
@@ -161,7 +171,7 @@ builds keep the original HUD and tutorial presentation.
 | `game/src/scenes/level.rs` | Level layout adjustment, action availability and publication of the current room tip. |
 | `game/src/render/board.rs` | Matching selection ring on the touch-controlled hero. |
 | `game/src/scenes/menu.rs` | Draggable sliders, scrollable settings, and visibility and control-side settings. |
-| `game/src/settings.rs` | Saved audio, screen-shake, visibility, control-side and map preferences. |
+| `game/src/settings.rs` | Saved audio, screen-shake, visibility, control-side, touch repeat delay and map preferences. |
 | `game/src/render/ui.rs` | Reclaims the portrait instruction panel's space for the board. |
 | `game/src/scenes/level/hud.rs` | Omits the replaced panel and its pointer targets. |
 | `game/src/app.rs` | Publishes scene state and coordinates tip visibility and input cancellation with scenes, menus and transitions. |

@@ -39,6 +39,7 @@ fn acting(action: Action) -> FrameInput {
         action,
         synced: false,
         fresh: true,
+        ready: true,
     });
     input
 }
@@ -455,6 +456,7 @@ fn screenshots() {
                     action,
                     synced: false,
                     fresh: true,
+                    ready: true,
                 });
                 app.step(&input, hints, 0);
                 run!(&still, 20);
