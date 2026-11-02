@@ -34,5 +34,7 @@ jobs:
         run: node tests/touch-tips.test.cjs
       - name: Test adaptive controls
         run: node tests/touch-state.test.cjs
+      - name: Test input mode detection
+        run: node tests/input-mode.test.cjs
       - name: Check browser shell syntax
         run: node --check js/touch-shell.js
