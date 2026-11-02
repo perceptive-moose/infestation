@@ -494,3 +494,42 @@ test("quick repeated Undo preserves both minimum-length taps while canceling int
     assert.ok(undoEvents[3].time - undoEvents[2].time >= 80);
     assert.equal(s.events.filter(event => event.type === "keydown" && event.code === "ArrowUp").length, 1);
 });
+
+for (const elapsed of [79.99, 79.5]) {
+    test(`a release deadline measured as ${elapsed} ms retries until the tap can end`, () => {
+        const s = setup({ dispatchKeyboardEvents: false });
+        const right = s.button({ direction: "right" });
+        // The timeout runs on schedule; the browser's exposed clock can be
+        // rounded or jittered independently of the timer's actual deadline.
+        s.window.performance.now = () => s.clock.now === 80 ? elapsed : s.clock.now;
+        s.down(right);
+        s.clock.advance(5);
+        s.up();
+        s.clock.advance(75);
+        assert.equal(s.api.inputBits() & 0x7fff, 1 << 3, "minimum hold still applies");
+        assert.equal(right.getAttribute("aria-pressed"), "false", "pointerup was processed");
+        s.clock.advance(2);
+        assert.equal(s.api.inputBits() & 0x7fff, 0, "retry releases the direction");
+        s.clock.advance(60_000);
+        assert.equal(s.api.inputBits(), 0);
+        assert.equal(s.clock.tasks.size, 0);
+    });
+}
+
+test("a fractional start time cannot strand a released direction at its deadline", () => {
+    const s = setup({ dispatchKeyboardEvents: false });
+    const right = s.button({ direction: "right" });
+    s.clock.advance(48.2);
+    s.down(right);
+    s.clock.advance(5);
+    s.up();
+    s.clock.advance(75);
+    assert.equal(s.clock.now, 128.2);
+    assert.ok(s.clock.now - 48.2 < 80, "floating-point subtraction rounds below the duration");
+    assert.equal(right.getAttribute("aria-pressed"), "false", "pointerup was processed");
+    s.clock.advance(2);
+    assert.equal(s.api.inputBits() & 0x7fff, 0, "an on-time callback must not latch the direction");
+    s.clock.advance(60_000);
+    assert.equal(s.api.inputBits(), 0);
+    assert.equal(s.clock.tasks.size, 0);
+});
