@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#100d16">
   <meta name="description" content="Play Infestation, David Spies’s turn-based puzzle game, with touch, keyboard or controller controls.">
   <title>Infestation</title>
-  <link rel="stylesheet" href="touch.css?v=input-audit">
+  <link rel="stylesheet" href="touch.css?v=direct-start">
 </head>
 <body data-input-mode="touch" data-wasm-path="target/wasm32-unknown-unknown/release/infestation.wasm?v=input-audit">
   <div class="app" id="app">
@@ -29,14 +29,10 @@
           </aside>
           <button type="button" class="tip-show" data-tip-show aria-label="Show room tip" hidden>Room tip <span aria-hidden="true">↑</span></button>
         </div>
-        <div class="welcome" id="welcome">
-          <div class="welcome-card">
-            <div class="eyebrow">THE KEEP IS WAITING</div>
-            <h1>One move.<br>A lot of rats.</h1>
-            <p>A turn-based puzzle adventure.<br>Every move matters.</p>
-            <button type="button" class="start" id="start-game" disabled><span id="start-label">Loading game…</span><span aria-hidden="true">→</span></button>
-            <p class="welcome-note" id="load-note" role="status">Preparing the original game and audio.</p>
-            <div class="credit">Game by <a href="https://github.com/davidspies/infestation" target="_blank" rel="noopener">David Spies</a></div>
+        <div class="loading" id="loading" role="status" aria-live="polite" aria-atomic="true">
+          <div class="loading-message">
+            <h2 id="loading-label">Loading game…</h2>
+            <p id="load-note">Preparing the game and audio.</p>
           </div>
         </div>
         <div class="toast" id="toast" role="status" hidden></div>
@@ -101,7 +97,7 @@
     <div class="progress-note"><strong>Your progress</strong><p>Completed rooms and settings are saved in this browser, separately from the original site.</p></div>
     <div class="help-links"><a href="https://github.com/perceptive-moose/infestation" target="_blank" rel="noopener">Touchscreen fork ↗</a><a href="https://github.com/davidspies/infestation" target="_blank" rel="noopener">Original source ↗</a></div>
     <p class="attribution">Original game by David Spies. The game credits its art, music and sound effects as AI generated.</p>
-    <button type="button" class="start help-done" id="help-done">Back to the game <span aria-hidden="true">→</span></button>
+    <button type="button" class="help-done" id="help-done">Back to the game <span aria-hidden="true">→</span></button>
   </dialog>
   <script src="js/gl.js"></script>
   <script src="js/sapp_jsutils.js"></script>
@@ -115,6 +111,6 @@
   <script src="js/touch-tips.js"></script>
   <script src="js/touch-state.js?v=input-audit"></script>
   <script src="js/input-mode.js?v=input-audit"></script>
-  <script src="js/touch-shell.js?v=input-audit"></script>
+  <script src="js/touch-shell.js?v=direct-start"></script>
 </body>
 </html>
