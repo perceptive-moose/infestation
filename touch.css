@@ -266,6 +266,18 @@ canvas{
   height:calc(3 * var(--pad) + 6px);
   flex-shrink:0
 }
+.dpad-right .controller-body{
+  grid-template-columns:minmax(0,3fr) minmax(calc(3 * var(--pad) + 6px),2fr)
+}
+.dpad-right .controller-meta{
+  flex-direction:row-reverse
+}
+.dpad-right .dpad{
+  grid-column:2
+}
+.dpad-right .actions,.dpad-right .context-actions{
+  grid-column:1
+}
 .dpad{
   grid-column:1;
   grid-row:1;
@@ -692,6 +704,9 @@ dialog>p{
   .controller-body{
     grid-template-columns:138px minmax(0,1fr);
     gap:8px
+  }
+  .dpad-right .controller-body{
+    grid-template-columns:minmax(0,1fr) 138px
   }
   .controls-hidden .play-area{
     grid-template-columns:minmax(0,1fr)

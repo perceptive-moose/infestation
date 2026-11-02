@@ -14,7 +14,6 @@
     const CONTEXT = {
         [SCREEN.title]: ["Play", "Begin exploring the keep."],
         [SCREEN.map]: ["Enter room", "Choose a room on the map."],
-        [SCREEN.menu]: ["Select", "Use the arrows or tap a menu item."],
         [SCREEN.code]: ["Close", "Return to the game."]
     };
 
@@ -43,6 +42,7 @@
         let player = "p1";
         let sync = false;
         let inputEpoch = 0;
+        let dpadRight = false;
 
         function interrupt() {
             // The engine also clears pending synchronized moves on a new epoch.
@@ -59,7 +59,7 @@
             // A room's INITIAL player count owns this row's geometry. Outcomes,
             // menus and temporary disabled actions must not collapse it.
             heroes.hidden = !twoHeroes;
-            playActions.hidden = Boolean(context);
+            playActions.hidden = Boolean(context) || state.screen === SCREEN.menu;
             contextActions.hidden = !context;
             for (const button of directions) button.disabled = !enabled(ACTION.direction);
             wait.disabled = !playing || !enabled(ACTION.wait);
@@ -132,6 +132,14 @@
         return {
             update,
             interrupt,
+            setDpadRight(value) {
+                value = Boolean(value);
+                if (dpadRight === value) return;
+                // Stop a held gesture before its button moves to the other side.
+                interrupt();
+                dpadRight = value;
+                root.classList.toggle("dpad-right", value);
+            },
             setAvailable(value) {
                 value = Boolean(value);
                 if (available === value) return;
