@@ -40,6 +40,10 @@ AI Disclaimer: This game uses entirely AI-generated artwork, music and sound eff
 - Direct taps on the game's menus and map, audio activation on a real gesture,
   and fullscreen where the browser supports it. Keyboard
   and controller controls remain available, and native builds retain their original HUD.
+- The opening Play screen accepts keyboard and controller confirmation. Help
+  pauses game input for every device, and returning to play suppresses carried
+  holds. Touch directions remain separate from physical keyboard input, so
+  changing instruction mode cannot change which hero a held key controls.
 - Undoable restarts: undo past the moves in a fresh attempt to restore the
   previous one, then keep undoing through earlier moves and restarts.
 
@@ -73,22 +77,26 @@ uses the Rust 2024 edition.
 
 ### Tests
 
-Run the game-state and scene regression tests, including undo across restarts:
+Run the game-state, scene and original puzzle-scenario regression tests,
+including undo across restarts:
 
 ```sh
-cargo test --locked -p infestation --lib
+cargo test --locked -p infestation -p scenario_tests --lib
 ```
 
 On Ubuntu, native tests need `libasound2-dev`, `libudev-dev` and `pkg-config`.
 
 The JavaScript tests use Node.js's built-in test runner and require no npm
-packages:
+packages. Run the Rust tests above first; their build step prepares the browser
+runtime used by the shell integration tests:
 
 ```sh
-node --test tests/touch-controls.test.cjs tests/touch-tips.test.cjs tests/touch-state.test.cjs tests/input-mode.test.cjs
+node --test tests/*.test.cjs
 ```
 
-These cover input handling, device detection, adaptive controls and room-tip state. Also test the served game on
+These cover input handling, device detection, adaptive controls, room-tip state,
+and integration of the browser shell with startup, Help and loading recovery.
+Also test the served game on
 physical phones: the Node tests do not exercise WebGL rendering, browser audio,
 fullscreen or device-specific touch behavior. The web game requires a browser
 with WebAssembly and working WebGL graphics support.
@@ -100,7 +108,8 @@ Actions** as the source. If GitHub has disabled workflows in the new fork,
 enable them from the **Actions** tab.
 
 The **Deploy to GitHub Pages** workflow runs on pushes to `master` and can also
-be started manually. It runs the game, touch-input and room-tip tests, builds the
+be started manually. It runs the game, original puzzle scenarios and browser
+regression tests, builds the
 current game with `Cargo.lock`, packages the matching browser files and music,
 and publishes the result. Future pushes to `master` update the playable site.
 The historical comparison versions remain in Git history; this workflow
