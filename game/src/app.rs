@@ -21,6 +21,7 @@ use crate::screen_wake;
 use crate::settings::Settings;
 use crate::sprites::Sprites;
 use crate::storage;
+use crate::touch_ui::{self, Screen as TouchScreen, State as TouchState};
 use crate::world_map::Theme;
 
 enum Scene {
@@ -71,6 +72,8 @@ pub struct App {
     settings: Settings,
     progress: Progress,
     input: InputState,
+    /// Last acknowledged cancellation of held or queued browser controls.
+    touch_input_epoch: u32,
     gamepad: GamepadContext,
     scene: Scene,
     overlay: Option<Overlay>,
@@ -149,6 +152,7 @@ impl App {
             settings,
             progress,
             input: InputState::new(),
+            touch_input_epoch: touch_ui::input_epoch(),
             gamepad: GamepadContext::new(),
             scene,
             overlay: None,
@@ -206,6 +210,7 @@ impl App {
 
     /// Run one frame. Returns false when the game should exit.
     pub fn tick(&mut self) -> bool {
+        self.cancel_interrupted_touch_input();
         self.gamepad.poll();
         let dt = get_frame_time().min(1.0 / 20.0);
         let input = self.poll_input(dt);
@@ -215,6 +220,57 @@ impl App {
         self.draw(&ScreenLayout::current(), hints, gamepads);
         self.gamepad.end_frame();
         !self.quit
+    }
+
+    fn cancel_interrupted_touch_input(&mut self) {
+        let epoch = touch_ui::input_epoch();
+        if epoch == self.touch_input_epoch {
+            return;
+        }
+        self.touch_input_epoch = epoch;
+        self.input.reset();
+        if let Scene::Level(level) = &mut self.scene {
+            level.cancel_pending_input();
+        }
+    }
+
+    fn touch_state(&self) -> TouchState<'static> {
+        let mut state = match &self.scene {
+            Scene::Title(_) => TouchState {
+                room: "",
+                screen: TouchScreen::Title,
+                players: 0,
+                actions: touch_ui::CONFIRM,
+            },
+            Scene::Map(map) => TouchState {
+                room: "",
+                screen: TouchScreen::Map,
+                players: 0,
+                actions: touch_ui::DIRECTION
+                    | if map.selected_level().is_some() {
+                        touch_ui::CONFIRM
+                    } else {
+                        0
+                    },
+            },
+            Scene::Level(level) => level.touch_state(),
+        };
+        if self.transition.is_some() {
+            state.screen = TouchScreen::Transition;
+            state.actions = 0;
+        } else if let Some(overlay) = &self.overlay {
+            match overlay {
+                Overlay::Menu(_) => {
+                    state.screen = TouchScreen::Menu;
+                    state.actions = touch_ui::DIRECTION | touch_ui::CONFIRM;
+                }
+                Overlay::Code(_) => {
+                    state.screen = TouchScreen::Code;
+                    state.actions = touch_ui::CONFIRM;
+                }
+            }
+        }
+        state
     }
 
     /// Advance everything by one frame of input.
@@ -355,6 +411,7 @@ impl App {
     }
 
     pub(crate) fn draw(&mut self, layout: &ScreenLayout, hints: InputHints, gamepads: usize) {
+        touch_ui::set_state(self.touch_state());
         // DOM tips have an app-level lifecycle, so they cannot linger on top of
         // another scene, a menu, an outcome card or the iris transition.
         match &self.scene {
