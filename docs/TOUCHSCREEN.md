@@ -14,7 +14,7 @@ to rush between moves.
 | --- | --- |
 | Directional pad | Move the selected hero. Tap for a step or hold to repeat. You can slide between directions. The center is inactive. |
 | Wait | Pass a turn without moving. In two-hero rooms, it supplies a wait for both heroes. |
-| Play / Enter room / Select / Close | Contextual confirmation on the title, map, menu or code screen. During gameplay, Continue is on the win card. |
+| Play / Enter room / Close | Contextual confirmation on the title, map or code screen. During gameplay, Continue is on the win card. Settings and menu items accept direct taps without an extra Select button. |
 | Undo | Take back a move or a restart. |
 | Restart | Tap twice within two seconds to start a fresh, undoable attempt. |
 | Blue / orange portrait | Choose the hero controlled by the directional pad. A matching ring marks that hero on the board. Shown only in two-hero rooms. |
@@ -25,7 +25,9 @@ to rush between moves.
 | Help (?) | Open the touch-control guide. |
 
 The game's own menu buttons and map rooms also accept direct taps. Drag the
-map to explore it. The pad and Select provide another way to navigate menus.
+map to explore it. The pad can highlight menu rows and adjust sliders;
+keyboard and gamepad confirmation remain available. Touch users choose a row
+by tapping it directly.
 Restart, Wait and Undo share the same style in the right-hand column, from top
 to bottom. Unavailable actions become disabled without moving the other buttons.
 Undo stays in its normal position after winning or losing. Wait never becomes
@@ -38,6 +40,23 @@ works after losing or winning, while you remain in that room. Restarting before
 making any moves adds no extra undo step. The move counter and exported solution
 describe only the current attempt. Leaving the room or reloading starts a new
 undo history; completed-room progress stays saved.
+
+### Settings and control sides
+
+Open the game menu with **☰**. Drag the **Music**, **Sound**, or **Screen shake**
+bar to adjust it, or tap a point on the bar. Values keep their existing eleven
+steps from 0 through 10. A slider stays attached to the gesture that started
+on it, so releasing outside the bar cannot activate another menu item.
+
+Tap **D-pad: left** or **D-pad: right** to swap the directional pad and the
+Restart / Wait / Undo column. The hero selectors follow the D-pad in two-hero
+rooms. This preference is saved with the game's settings and restored on the
+next visit; existing saves keep the D-pad on the left until you change it.
+Swapping sides keeps the dock and game area the same size.
+
+On smaller screens, swipe the settings list outside a slider to scroll to
+the remaining options. A mouse wheel also scrolls, and D-pad or keyboard
+navigation brings the focused row into view.
 
 ### Two heroes and Move together
 
@@ -102,9 +121,11 @@ builds keep the original HUD and tutorial presentation.
 | `js/touch-shell.js` | Loading, audio activation, visibility, fullscreen, help and the JavaScript side of the game bridge. |
 | `js/touch-state.js` | Scene-aware action availability, hero controls, contextual labels and input cancellation. |
 | `js/touch-tips.js` | Tip identity, typewriter text, dismissal, suppression and scroll restoration. |
-| `game/src/touch_ui.rs` | WebAssembly imports for dock state, selected hero, input cancellation, visibility and authored tip text, with native fallbacks. |
+| `game/src/touch_ui.rs` | WebAssembly imports for dock state, control-side preference, selected hero, input cancellation, visibility and authored tip text, with native fallbacks. |
 | `game/src/scenes/level.rs` | Level layout adjustment, action availability and publication of the current room tip. |
 | `game/src/render/board.rs` | Matching selection ring on the touch-controlled hero. |
+| `game/src/scenes/menu.rs` | Draggable sliders, scrollable settings and the control-side setting. |
+| `game/src/settings.rs` | Saved audio, screen-shake, control-side and map preferences. |
 | `game/src/render/ui.rs` | Reclaims the portrait instruction panel's space for the board. |
 | `game/src/scenes/level/hud.rs` | Omits the replaced panel and its pointer targets. |
 | `game/src/app.rs` | Publishes scene state and coordinates tip visibility and input cancellation with scenes, menus and transitions. |
@@ -156,7 +177,7 @@ lost graphics context. Fullscreen depends on browser support, and audio needs
 a real user gesture. Automated DOM/input tests do not establish rendering
 performance or compatibility on a physical phone.
 
-Some original tutorial wording still names keyboard keys. Very short screens
-can leave menus cramped; try portrait, hide the controls, or navigate with the
-pad and Select. Progress uses this site's browser storage and is separate from
+Some original tutorial wording still names keyboard keys. Settings scroll on
+short screens; portrait mode gives the panel more space. Progress uses this
+site's browser storage and is separate from
 progress on the original upstream site or another hosting origin.
