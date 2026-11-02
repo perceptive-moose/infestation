@@ -414,6 +414,7 @@ impl App {
     }
 
     pub(crate) fn draw(&mut self, layout: &ScreenLayout, hints: InputHints, gamepads: usize) {
+        touch_ui::set_visibility(self.settings.touch_controls_visible);
         touch_ui::set_layout(self.settings.touch_dpad_right);
         touch_ui::set_state(self.touch_state());
         // DOM tips have an app-level lifecycle, so they cannot linger on top of
