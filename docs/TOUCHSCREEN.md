@@ -44,7 +44,7 @@ The Help guide also follows the active input method.
 
 On a device with more than one input method, touch or pen input selects touch
 mode; a physical keyboard, mouse or freshly used controller selects its mode.
-Touch-generated keyboard events do not count as physical keyboard use. An idle
+Touch input is tracked separately from physical keyboard input. An idle
 connected controller, a previously held input or small stick drift cannot steal
 touch mode. Without a saved preference, the dock starts visible on touch
 devices and hidden on desktops. **On-screen controls: shown / hidden** in
@@ -97,10 +97,11 @@ each hero can contribute a direction to the same turn. With the direction
 buttons released, Wait supplies waiting inputs for both heroes.
 
 An idle connected controller does not change which hero the touch pad controls.
-When you switch to physical controls, the original routing returns: the first
-controller moves the blue hero, while the keyboard or second controller moves
-the orange hero. Without a controller, arrow keys move the blue hero and WASD
-moves the orange hero.
+Physical controls always keep their original routing: the first controller
+moves the blue hero, while the keyboard or second controller moves the orange
+hero. Without a controller, arrow keys move the blue hero and WASD moves the
+orange hero. Touching the screen changes the instructions without transferring
+a held keyboard direction to a different hero.
 
 ## Layout and room tips
 
@@ -144,7 +145,7 @@ builds keep the original HUD and tutorial presentation.
 | --- | --- |
 | `index.html` | Web page, control buttons, welcome/help UI and room-tip markup. |
 | `touch.css` | Compact responsive dock, safe areas and independent tip overlay. |
-| `js/touch-controls.js` | Pointer input, hero selection, Sync modifiers and keyboard-event dispatch to the canvas. |
+| `js/touch-controls.js` | Pointer input, hero selection, Sync modifiers and independently polled touch actions. |
 | `js/touch-shell.js` | Loading, audio activation, visibility, fullscreen, help and the JavaScript side of the game bridge. |
 | `js/touch-state.js` | Scene-aware action availability, hero controls, contextual labels and input cancellation. |
 | `js/touch-tips.js` | Tip identity, typewriter text, dismissal, suppression and scroll restoration. |

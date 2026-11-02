@@ -46,7 +46,7 @@ class Target {
     }
 }
 
-function setup({ ready = true } = {}) {
+function setup({ ready = true, dispatchKeyboardEvents = true } = {}) {
     const clock = new Clock();
     const window = new Target();
     const document = new Target();
@@ -73,7 +73,7 @@ function setup({ ready = true } = {}) {
         dispatchEvent(event) { events.push({ ...event, time: clock.now }); }
     };
     vm.runInNewContext(source, { window });
-    const api = window.InfestationTouch.create({ canvas, root,
+    const api = window.InfestationTouch.create({ canvas, root, dispatchKeyboardEvents,
         onAction: action => actions.push(action), onInterrupt: () => interruptions.push(clock.now) });
 
     function button(dataset) {
@@ -130,6 +130,58 @@ test("quick touch remains down for 80 ms and releases without native mouse event
     assert.equal(s.events[0].which, 38);
     assert.equal(s.events[0].key, "ArrowUp");
     assert.equal(s.canvas.focused, true);
+});
+
+test("explicit touch input preserves tap timing without dispatching physical keyboard events", () => {
+    const s = setup({ dispatchKeyboardEvents: false });
+    s.down(s.button({ direction: "up" }));
+    assert.equal(s.api.inputBits(), (1 << 0) | (1 << 16));
+    assert.equal(s.api.inputBits(), 1 << 0, "fresh edges are consumed once");
+    s.up();
+    s.clock.advance(79);
+    assert.equal(s.api.inputBits(), 1 << 0);
+    s.clock.advance(1);
+    assert.equal(s.api.inputBits(), 0);
+    assert.deepEqual(s.keys(), [], "touch press/release must not alter physical key state");
+});
+
+test("a cancelled touch edge disappears while a new same-key tap remains fresh", () => {
+    const s = setup({ dispatchKeyboardEvents: false });
+    s.api.tap("KeyU");
+    const first = s.api.inputBits();
+    s.api.releaseAll();
+    s.api.tap("KeyU");
+    assert.equal(s.api.inputBits(), first, "a fresh press survives even without a released poll");
+    s.api.tap("ArrowRight");
+    s.api.releaseAll();
+    assert.equal(s.api.inputBits(), 0, "cancelled presses must not reappear on a later poll");
+    s.clock.advance(200);
+    assert.equal(s.api.inputBits(), 0);
+    assert.deepEqual(s.keys(), []);
+});
+
+test("explicit touch snapshots distinguish both heroes, sync modifiers and action buttons", () => {
+    for (const [code, bit] of [
+        ["ArrowUp", 0], ["ArrowDown", 1], ["ArrowLeft", 2], ["ArrowRight", 3],
+        ["KeyW", 4], ["KeyS", 5], ["KeyA", 6], ["KeyD", 7],
+        ["Space", 10], ["KeyU", 11], ["KeyR", 12], ["Escape", 13], ["Enter", 14]
+    ]) {
+        const s = setup({ dispatchKeyboardEvents: false });
+        s.api.tap(code);
+        assert.equal(s.api.inputBits(), ((1 << bit) | (1 << (bit + 16))) >>> 0, code);
+        assert.deepEqual(s.keys(), []);
+    }
+    for (const [player, direction, modifier] of [["p1", 0, 8], ["p2", 4, 9]]) {
+        const s = setup({ dispatchKeyboardEvents: false });
+        s.api.setPlayer(player);
+        s.api.setSync(true);
+        s.down(s.button({ direction: "up" }));
+        const bits = (1 << direction) | (1 << modifier);
+        assert.equal(s.api.inputBits(), (bits | (bits << 16)) >>> 0);
+        s.up();
+        s.clock.advance(80);
+        assert.equal(s.api.inputBits(), 0);
+    }
 });
 
 test("a held control stays down for the engine's own repeat and releases immediately after the minimum", () => {
