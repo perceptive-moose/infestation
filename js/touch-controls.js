@@ -102,8 +102,17 @@
         }
 
         function finishWhenReleased(lane, cycle) {
-            if (lane.current !== cycle || cycle.owners.size || cycle.frames < 2 ||
-                window.performance.now() - cycle.startedAt < MIN_PRESS_MS) return;
+            if (lane.current !== cycle || cycle.owners.size || cycle.frames < 2) return;
+            const remaining = MIN_PRESS_MS - (window.performance.now() - cycle.startedAt);
+            if (remaining > 0) {
+                // Clock precision can leave an on-time callback just short of
+                // the minimum. Always retry so a released press cannot stick.
+                window.clearTimeout(cycle.timer);
+                cycle.timer = window.setTimeout(function () {
+                    finishWhenReleased(lane, cycle);
+                }, Math.max(1, Math.ceil(remaining)));
+                return;
+            }
             window.clearTimeout(cycle.timer);
             window.cancelAnimationFrame(cycle.frame);
             releaseKey(cycle.code);
