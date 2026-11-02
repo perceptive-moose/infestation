@@ -1,0 +1,435 @@
+{
+  "repository": "perceptive-moose/infestation",
+  "old_head": "d048d86fabc423ef6e5e30ad488efe648d4f1d32",
+  "new_head": "5abef0257f820bb5f3e9d9a1fca1866ca366b751",
+  "upstream": "a6ef414767b61977056df2b033e55334d4ff7180",
+  "tree": "5dcd4c2cfc990ce52ca8071dbfce4b2800af10fe",
+  "candidate_ref": "refs/heads/chronological-master",
+  "bundle_sha256": "03f44b8467da48827b3e92e26d64f75dabea0472acf0038edc027178d2ce82ec",
+  "method": "Preserve each original squash commit's exact timestamp for its replacement merge. Evenly distribute multiple curated feature commits across that PR's recorded first-to-last upload interval, rounding down to whole seconds. For a single curated feature, use the last upload time. These feature dates are approximations, not recovered per-change creation times. Set author and committer dates alike; preserve original timezone offsets, identities, messages, coauthor trailers, file trees, and merge structure.",
+  "pull_requests": [
+    {
+      "pr": 1,
+      "url": "https://github.com/perceptive-moose/infestation/pull/1",
+      "original_uploads": [
+        "a888650db4fcde8e74d580e2454caafd3c5012ce",
+        "570b7d4594a366ec32971e65733686516de25945",
+        "d4df04dee045c599c1e12f9e25721557999a6d80",
+        "2d7f6d6b1e635bbbcb55867e54e17bbcfdbf3ba8",
+        "30cf9d1646ddcf299e159e961e033e7879d9f354",
+        "d82fba7993f5df0aaea6cdbe7f71936ac8928864",
+        "3a9d70371c8faf19eaf3ecaebec8577b57fe2f48",
+        "f849f9102dd4c3a0b3b782c64ff978c70f739006",
+        "65fa88b57879293980f1c7e3a5b90e6860548756",
+        "9f41be6926a1bdf0e594c736e4692393c8a9ab1b",
+        "f1639af9f3df5cead39de8f7996fd5e9a3a66b41"
+      ],
+      "original_squash": "683f65c43f0aa84a18de5c4edaf076afe6fae297",
+      "first_upload": "2026-11-01T22:58:54-05:00",
+      "last_upload": "2026-11-01T23:04:24-05:00",
+      "original_merge": "2026-11-01T23:05:40-05:00",
+      "feature_count": 3,
+      "replacement_merge": "3cd93bed36fba593bc297e137b6d0e649c4d044d"
+    },
+    {
+      "pr": 2,
+      "url": "https://github.com/perceptive-moose/infestation/pull/2",
+      "original_uploads": [
+        "e710fe3eb3851886c60fb705db7dd9114b4e4c23",
+        "af47591ef8e51438b18e72c42ee2baf7910d393f",
+        "54229b2c761598901a67f8463203171f36a8db58",
+        "2216b5772cf7a26528f631a491b13225b647395e",
+        "8bfd24c86b2ef51e9050a800f04ef785b57fc215",
+        "d2c2e0cc7f430a6857b8f30864bf4ec3d6a8bda4",
+        "d49db87673a6daefdd9b2fa88fb26616fbf0ff69"
+      ],
+      "original_squash": "68df37681254408859ecf3bf97e75b6f060c8047",
+      "first_upload": "2026-11-01T23:48:37-05:00",
+      "last_upload": "2026-11-01T23:51:17-05:00",
+      "original_merge": "2026-11-01T23:53:46-05:00",
+      "feature_count": 2,
+      "replacement_merge": "cdcf20ad72eef11b026a75c409497ae1b062788f"
+    },
+    {
+      "pr": 3,
+      "url": "https://github.com/perceptive-moose/infestation/pull/3",
+      "original_uploads": [
+        "cdfc902e931e74584e5d2727befd33e43593c4bb",
+        "250af266f2d2c033d8c70a627cbe8ee88757de72",
+        "ecce695966288303e4073793c20f87703aefffb5",
+        "f4c6cc95eef49c6f9f76657a52f08baf939bed6a",
+        "2a80a7ff06c30452b6e24a4a3fb05bebc7234178",
+        "0cdd5acec71c94a52a906b01683ed31af92bf391",
+        "8240596d500578454bd143fc9222274e2abbd7af",
+        "be49b8d3c6c8e0ffea8bcc414a58869bb34da860",
+        "5695ee9062fe273332b2f8f8af627492fa5df301"
+      ],
+      "original_squash": "00ba80857bc332a6c7bfd50361b35d0b7580e84f",
+      "first_upload": "2026-11-02T00:26:07-05:00",
+      "last_upload": "2026-11-02T00:33:19-05:00",
+      "original_merge": "2026-11-02T00:35:08-05:00",
+      "feature_count": 3,
+      "replacement_merge": "18e3979b088ecc4cf933e00d0a020950d9936e82"
+    },
+    {
+      "pr": 4,
+      "url": "https://github.com/perceptive-moose/infestation/pull/4",
+      "original_uploads": [
+        "99fe600540d819f289d9c8ea3546fd036d6e6948",
+        "a561ee4284a5079219f0edbfa0fa2e7da841f881",
+        "5d6e9d08634077eaebba893a7ae507b07c1d8ac5",
+        "13021b593885c6c7adb0b02777097f2c1a273fe1",
+        "951ba6ffaaaa239575e52af15757a3c520ca92d2",
+        "10a43a926c97e48efd55d102ce8ffc75f63f8c6a"
+      ],
+      "original_squash": "341cd76430f7cc6c2f7dfac49d8bbcc46297b092",
+      "first_upload": "2026-11-02T00:52:22-05:00",
+      "last_upload": "2026-11-02T00:56:16-05:00",
+      "original_merge": "2026-11-02T00:58:37-05:00",
+      "feature_count": 3,
+      "replacement_merge": "9b66d2c3dfca0bc1bb085419323e1383bdc36ef9"
+    },
+    {
+      "pr": 5,
+      "url": "https://github.com/perceptive-moose/infestation/pull/5",
+      "original_uploads": [
+        "fc2150a4775f083dede79d921ad5c9e081dfc416",
+        "c7bff2350dc60bbabb582fc01037a9b531718944",
+        "bc98bd620945516849e2d0136b15c1e41a8ba6f9",
+        "b8dd3e51c373549a27a41bb43cfc22c5e0b258a8",
+        "8d670b6abde65fbe7fc94a47f2816131c39c9d70",
+        "a18f61e9ee1a43773249d638c88ca84a5e70069e",
+        "3d00a9830602b10476d67bb2c025f7a4fa0ca77c",
+        "05455bfc15c9c2fd4488dec14fa14280d00295dd",
+        "28ca78e2f0f8551e8d208319dacaf7719f321978",
+        "45148ce4f987a36c19f82971179b6b79fe2766ec",
+        "8ef8ad8381e5c2c88b3780a2a661c4e330f6caf4"
+      ],
+      "original_squash": "2c05f78c4ea88d95f042a1294dbd862cc6edb03c",
+      "first_upload": "2026-11-02T01:13:56-05:00",
+      "last_upload": "2026-11-02T01:16:47-05:00",
+      "original_merge": "2026-11-02T01:19:17-05:00",
+      "feature_count": 2,
+      "replacement_merge": "dcca227a7caf73fccf45e2bb386019701d6d162f"
+    },
+    {
+      "pr": 6,
+      "url": "https://github.com/perceptive-moose/infestation/pull/6",
+      "original_uploads": [
+        "e3cded4fb00027a270915634607e22423f09f94d",
+        "4ed11b7697dc26610a33b5d9b0485d3b47f7c769",
+        "9d8b216892555caf112528e40889c8a450c36506",
+        "d6ef93f66caeb5ba85086d8d55fcf319d06a90a0",
+        "d95fb9cffc45c5813252acc2ed89bbd39a077b47",
+        "5c07514fdffb1b165d9b1a4154110ad1e717c2cf",
+        "5a95996bcd114d165fd6b707d541892ac9a6eb2b"
+      ],
+      "original_squash": "7d2df58d1f6a9f468b83f1f8a853008e1703e9e1",
+      "first_upload": "2026-11-02T01:29:35-05:00",
+      "last_upload": "2026-11-02T01:31:30-05:00",
+      "original_merge": "2026-11-02T01:33:24-05:00",
+      "feature_count": 1,
+      "replacement_merge": "87c524d9aa108a125f9e569963147ddce971c68b"
+    },
+    {
+      "pr": 7,
+      "url": "https://github.com/perceptive-moose/infestation/pull/7",
+      "original_uploads": [
+        "1ed0579ba480f774da9fd9bb3173b351164e6c9a",
+        "5f347dd3ae36e7774858bfb955e84d269cfdb156",
+        "5f4f0ba622a493a5a3d802e0fc0071449a1dc07c",
+        "9aee89a8b14c7b5fbe2b649a02816c3c70c82b84",
+        "e8fd4091a782ddc90299ca566c8a0b1735cbde85",
+        "b2483840b15034b29b74c97fbca5e8842004694a",
+        "d6a75ba252f5cd579c2e9027274df1651ed5c794",
+        "f124ac0383550d2a2c53e97005ffbc7e691da505",
+        "1cd0e80e54b2be66c2d2d10ed78b5f20ba4ef423",
+        "15d190cb05a8ac53fb948a1575725626726daf2a"
+      ],
+      "original_squash": "3db28275a7315ec553a011b4c41210cf0445559a",
+      "first_upload": "2026-11-02T01:59:14-05:00",
+      "last_upload": "2026-11-02T02:04:41-05:00",
+      "original_merge": "2026-11-02T02:07:19-05:00",
+      "feature_count": 3,
+      "replacement_merge": "9ca05fc8213c1658b2d7bd96d971ff24bdf28e2f"
+    },
+    {
+      "pr": 8,
+      "url": "https://github.com/perceptive-moose/infestation/pull/8",
+      "original_uploads": [
+        "440e82139f4839af2e5f7afe530056af819f7025",
+        "fc6223651fa22e3eaac911d515464c42dc51e446",
+        "ea967b6eb43948bcc56e07c1160453a7131f8fbb",
+        "b29c4afce9ec5ba38fe75a3a5057f24457165901"
+      ],
+      "original_squash": "292f459b3a11a5ec0fa23f388f11d1e0800a9413",
+      "first_upload": "2026-11-02T02:23:23-05:00",
+      "last_upload": "2026-11-02T02:25:01-05:00",
+      "original_merge": "2026-11-02T02:29:52-05:00",
+      "feature_count": 1,
+      "replacement_merge": "5abef0257f820bb5f3e9d9a1fca1866ca366b751"
+    }
+  ],
+  "commits": [
+    {
+      "pr": 1,
+      "kind": "feature",
+      "old": "16389505bc2fed27880d45c7eea1959d51ee2723",
+      "new": "05b390383c0252c3154530ab2851bcd69ac3c068",
+      "epoch": 1793591934,
+      "offset": "-0500",
+      "date": "2026-11-01T22:58:54-05:00",
+      "subject": "Add a touch input adapter with pointer and key ownership tests"
+    },
+    {
+      "pr": 1,
+      "kind": "feature",
+      "old": "343071eabe4a776a1e3c1b388521e69801857253",
+      "new": "3599f2497e7b0b42ed4f037346c19a143bdea5a7",
+      "epoch": 1793592099,
+      "offset": "-0500",
+      "date": "2026-11-01T23:01:39-05:00",
+      "subject": "Add the mobile browser shell and publish its complete assets"
+    },
+    {
+      "pr": 1,
+      "kind": "feature",
+      "old": "c5412a860b50af9f628aad6d0adb338f63c1229f",
+      "new": "3a2d35b7f5a9eb23abed25a0497e9f94ece7e7ce",
+      "epoch": 1793592264,
+      "offset": "-0500",
+      "date": "2026-11-01T23:04:24-05:00",
+      "subject": "Keep the portrait puzzle stationary while displaying room tips"
+    },
+    {
+      "pr": 1,
+      "kind": "merge",
+      "old": "ebf2ba723afabb1335908084af8297c1c33cf37b",
+      "new": "3cd93bed36fba593bc297e137b6d0e649c4d044d",
+      "epoch": 1793592340,
+      "offset": "-0500",
+      "date": "2026-11-01T23:05:40-05:00",
+      "subject": "Merge PR #1: Add touchscreen controls and GitHub Pages deployment"
+    },
+    {
+      "pr": 2,
+      "kind": "feature",
+      "old": "0def6b9d5413f4bacd74ef4851b808191fedda94",
+      "new": "545c8d12385d502631eb4325cbec7dd132441135",
+      "epoch": 1793594917,
+      "offset": "-0500",
+      "date": "2026-11-01T23:48:37-05:00",
+      "subject": "Preserve previous attempts when restarting a puzzle"
+    },
+    {
+      "pr": 2,
+      "kind": "feature",
+      "old": "82d64b57ca851d236321312546f0972974fb3cfe",
+      "new": "e65965aa52b346a690081d2ecd9ac1157dcc7257",
+      "epoch": 1793595077,
+      "offset": "-0500",
+      "date": "2026-11-01T23:51:17-05:00",
+      "subject": "Expose undoable restarts through level actions and presentation"
+    },
+    {
+      "pr": 2,
+      "kind": "merge",
+      "old": "68fc6e8f8a6f21012c2bf5c19e78c637b07f8fd5",
+      "new": "cdcf20ad72eef11b026a75c409497ae1b062788f",
+      "epoch": 1793595226,
+      "offset": "-0500",
+      "date": "2026-11-01T23:53:46-05:00",
+      "subject": "Merge PR #2: Make restarts undoable"
+    },
+    {
+      "pr": 3,
+      "kind": "feature",
+      "old": "6390ba3e2acc1db496e0482343e9e37addf3bbe2",
+      "new": "8c8c051c7dacf1b876ffb103ec82b9c319c41520",
+      "epoch": 1793597167,
+      "offset": "-0500",
+      "date": "2026-11-02T00:26:07-05:00",
+      "subject": "Accept a fresh input press after clearing an interrupted hold"
+    },
+    {
+      "pr": 3,
+      "kind": "feature",
+      "old": "21171db84beb40424a2d88824ba5ad1e9844ea8f",
+      "new": "3ba924f38cebbc2749f157046f664d9afe9fca49",
+      "epoch": 1793597383,
+      "offset": "-0500",
+      "date": "2026-11-02T00:29:43-05:00",
+      "subject": "Release touch holds safely when switching heroes or actions"
+    },
+    {
+      "pr": 3,
+      "kind": "feature",
+      "old": "fcdf886163ccc59f8e58bb239a76ec31995a3153",
+      "new": "0fa077fe96a0e2ca075817eb8133a55f87ea4dcf",
+      "epoch": 1793597599,
+      "offset": "-0500",
+      "date": "2026-11-02T00:33:19-05:00",
+      "subject": "Adapt the D-pad and action column to the current game state"
+    },
+    {
+      "pr": 3,
+      "kind": "merge",
+      "old": "4663c32f8030d334e9946581ea521d66a34a29b8",
+      "new": "18e3979b088ecc4cf933e00d0a020950d9936e82",
+      "epoch": 1793597708,
+      "offset": "-0500",
+      "date": "2026-11-02T00:35:08-05:00",
+      "subject": "Merge PR #3: Redesign touch controls around movement, wait and undo"
+    },
+    {
+      "pr": 4,
+      "kind": "feature",
+      "old": "21528b24541a41a9d64a169f148b679b3ea74ac9",
+      "new": "5a8014311671332fd84f89351a5658c7d453bdf8",
+      "epoch": 1793598742,
+      "offset": "-0500",
+      "date": "2026-11-02T00:52:22-05:00",
+      "subject": "Make settings sliders draggable and the menu scrollable"
+    },
+    {
+      "pr": 4,
+      "kind": "feature",
+      "old": "81d0204f95abeb801ebfc4a24bb043da1e2f89ae",
+      "new": "1093943ea9626602a20e955ab650e0d2b735390b",
+      "epoch": 1793598859,
+      "offset": "-0500",
+      "date": "2026-11-02T00:54:19-05:00",
+      "subject": "Save and apply the preferred side of the touch D-pad"
+    },
+    {
+      "pr": 4,
+      "kind": "feature",
+      "old": "a65bac1d570a3debe618ea018d33f9a131b76677",
+      "new": "797bc0107dda4a109a444915337afffe6f280185",
+      "epoch": 1793598976,
+      "offset": "-0500",
+      "date": "2026-11-02T00:56:16-05:00",
+      "subject": "Remove redundant Select from the touch settings dock"
+    },
+    {
+      "pr": 4,
+      "kind": "merge",
+      "old": "71d596e38ad6ad443aac1ee30a8858aa89d30cf6",
+      "new": "9b66d2c3dfca0bc1bb085419323e1383bdc36ef9",
+      "epoch": 1793599117,
+      "offset": "-0500",
+      "date": "2026-11-02T00:58:37-05:00",
+      "subject": "Merge PR #4: Make settings draggable and allow swapping touch controls"
+    },
+    {
+      "pr": 5,
+      "kind": "feature",
+      "old": "30ed16d8ec8741406d20abb75cc3c47b3c897dec",
+      "new": "16a7b48f2757b7de6a59b8a92a037acd63f4c52d",
+      "epoch": 1793600036,
+      "offset": "-0500",
+      "date": "2026-11-02T01:13:56-05:00",
+      "subject": "Remove touch-demo branding from the game shell"
+    },
+    {
+      "pr": 5,
+      "kind": "feature",
+      "old": "c89aa89b16e063a7f5d34852132b7bd9bedb9bc0",
+      "new": "875932baa295bf8e5c07664574d1cd6fb095f446",
+      "epoch": 1793600207,
+      "offset": "-0500",
+      "date": "2026-11-02T01:16:47-05:00",
+      "subject": "Match instructions and hero routing to the active input device"
+    },
+    {
+      "pr": 5,
+      "kind": "merge",
+      "old": "1e1e816c41de0e3cc45436eebc5b4b88e364c68e",
+      "new": "dcca227a7caf73fccf45e2bb386019701d6d162f",
+      "epoch": 1793600357,
+      "offset": "-0500",
+      "date": "2026-11-02T01:19:17-05:00",
+      "subject": "Merge PR #5: Adapt instructions to touch, keyboard and controller input"
+    },
+    {
+      "pr": 6,
+      "kind": "feature",
+      "old": "11b9ca9fd5780373770f40e16e8803d33daba7bc",
+      "new": "fffa414355f98a836653ba14d06c3b5bef40c1d6",
+      "epoch": 1793601090,
+      "offset": "-0500",
+      "date": "2026-11-02T01:31:30-05:00",
+      "subject": "Persist on-screen control visibility in game settings"
+    },
+    {
+      "pr": 6,
+      "kind": "merge",
+      "old": "d9d5ef02af22dd1e4031f348e314df62426a0299",
+      "new": "87c524d9aa108a125f9e569963147ddce971c68b",
+      "epoch": 1793601204,
+      "offset": "-0500",
+      "date": "2026-11-02T01:33:24-05:00",
+      "subject": "Merge PR #6: Move on-screen controls visibility into saved settings"
+    },
+    {
+      "pr": 7,
+      "kind": "feature",
+      "old": "6a707d7e971106d59e90af9372c46644b74adca6",
+      "new": "d91753526c7e11e0d0a2ec90f50f0ae1e8f8642a",
+      "epoch": 1793602754,
+      "offset": "-0500",
+      "date": "2026-11-02T01:59:14-05:00",
+      "subject": "Keep touch input independent of physical keyboard and controllers"
+    },
+    {
+      "pr": 7,
+      "kind": "feature",
+      "old": "5e5d22ff78ea3e3037036e3cb34f2aa55d44e184",
+      "new": "43e4235b208b0c76d57beb33e561179a8c89ed0a",
+      "epoch": 1793602917,
+      "offset": "-0500",
+      "date": "2026-11-02T02:01:57-05:00",
+      "subject": "Isolate browser overlays from game input and recover slow loading"
+    },
+    {
+      "pr": 7,
+      "kind": "feature",
+      "old": "c08c21a2d93a37c502fefc2edd094a82f15a5798",
+      "new": "ec414bac4880c78116060f3c9ffec0877590ea28",
+      "epoch": 1793603081,
+      "offset": "-0500",
+      "date": "2026-11-02T02:04:41-05:00",
+      "subject": "Clear pending synchronized moves when restarting before turn one"
+    },
+    {
+      "pr": 7,
+      "kind": "merge",
+      "old": "1e4fcefce912c48410e5bb47c3fda66ab5119431",
+      "new": "9ca05fc8213c1658b2d7bd96d971ff24bdf28e2f",
+      "epoch": 1793603239,
+      "offset": "-0500",
+      "date": "2026-11-02T02:07:19-05:00",
+      "subject": "Merge PR #7: Fix browser input isolation and preserve keyboard/controller behavior"
+    },
+    {
+      "pr": 8,
+      "kind": "feature",
+      "old": "5cfba040f5ee72f86b61a95d718e6493a1835d33",
+      "new": "937d00fde0fcc7b7a4f07666755e75b228381539",
+      "epoch": 1793604301,
+      "offset": "-0500",
+      "date": "2026-11-02T02:25:01-05:00",
+      "subject": "Enter the original title screen automatically after loading"
+    },
+    {
+      "pr": 8,
+      "kind": "merge",
+      "old": "d048d86fabc423ef6e5e30ad488efe648d4f1d32",
+      "new": "5abef0257f820bb5f3e9d9a1fca1866ca366b751",
+      "epoch": 1793604592,
+      "offset": "-0500",
+      "date": "2026-11-02T02:29:52-05:00",
+      "subject": "Merge PR #8: Open the original title screen automatically after loading"
+    }
+  ]
+}
