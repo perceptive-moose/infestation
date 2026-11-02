@@ -213,13 +213,19 @@ impl LevelScene {
     }
 
     pub(crate) fn restart(&mut self, ctx: &mut Ctx) {
-        if !self.game.can_restart() {
-            return;
+        let had_turns = self.game.can_restart();
+        self.rewind_to_start();
+        if had_turns {
+            self.fx.wash(Color::new(1.0, 1.0, 1.0, 0.35), 0.35);
+            ctx.audio.play(Sfx::Restart);
         }
+    }
+
+    /// Restart also cancels a move waiting for the other hero before turn one.
+    /// Game::restart records history only when there are resolved turns to undo.
+    fn rewind_to_start(&mut self) {
         self.game.restart();
         self.after_rewind();
-        self.fx.wash(Color::new(1.0, 1.0, 1.0, 0.35), 0.35);
-        ctx.audio.play(Sfx::Restart);
     }
 
     fn undo(&mut self, ctx: &mut Ctx) {
@@ -569,8 +575,7 @@ mod tests {
     fn undo_stays_enabled_after_restart() {
         let mut scene = scene_from_csv("▲,.,.");
         assert!(scene.game.apply_action(Action::Move(Dir4::East)));
-        scene.game.restart();
-        scene.after_rewind();
+        scene.rewind_to_start();
 
         assert_eq!(scene.game.state.history.len(), 1);
         assert!(scene.action_enabled(UiAction::Undo));
@@ -592,6 +597,61 @@ mod tests {
     }
 
     #[test]
+    fn restarting_before_turn_one_cancels_sync_without_adding_undo_history() {
+        let mut scene = scene_from_csv("▲,.,.\n.,.,.\n△,.,.");
+        let mut input = FrameInput {
+            dt: 1.0 / 60.0,
+            meta: Vec::new(),
+            players: EnumMap::default(),
+            nav: None,
+            pointer: Vec::new(),
+            wheel: 0.0,
+            any: true,
+        };
+        input.players[Player::Player1] = Some(PlayerInput {
+            action: Action::Move(Dir4::East),
+            synced: true,
+            fresh: true,
+        });
+        scene.queue_player_input(&input, false);
+        scene.advance_pending_timer(1.0);
+        scene.try_execute_pending();
+        input.players[Player::Player1] = None;
+        scene.queue_player_input(&input, false);
+        assert!(!scene.pending_ghosts().is_empty());
+        assert!(!scene.game.can_restart());
+
+        // The menu can request a restart even before a turn has resolved.
+        scene.rewind_to_start();
+
+        assert!(scene.pending_ghosts().is_empty());
+        assert_eq!(scene.pending_timer, 0.0);
+        assert!(!scene.game.can_undo());
+        assert!(!scene.game.can_restart());
+
+        input.players[Player::Player2] = Some(PlayerInput {
+            action: Action::Move(Dir4::East),
+            synced: false,
+            fresh: true,
+        });
+        scene.queue_player_input(&input, false);
+        scene.advance_pending_timer(SYNC_GRACE_PERIOD);
+        scene.try_execute_pending();
+        assert_eq!(
+            scene.game.state.player_position(Player::Player1),
+            Some(Position::new(0, 0))
+        );
+        assert_eq!(
+            scene.game.state.player_position(Player::Player2),
+            Some(Position::new(1, 2))
+        );
+        assert_eq!(
+            scene.game.state.action_history,
+            vec![vec![Action::Stall, Action::Move(Dir4::East)]]
+        );
+    }
+
+    #[test]
     fn touch_actions_follow_moves_and_undoable_restarts() {
         let mut scene = scene_from_csv("▲,.,.");
         let initial = scene.touch_state();
@@ -604,8 +664,7 @@ mod tests {
             scene.touch_state().actions,
             touch_ui::DIRECTION | touch_ui::WAIT | touch_ui::UNDO | touch_ui::RESTART
         );
-        scene.game.restart();
-        scene.after_rewind();
+        scene.rewind_to_start();
         assert_eq!(
             scene.touch_state().actions,
             touch_ui::DIRECTION | touch_ui::WAIT | touch_ui::UNDO
@@ -623,7 +682,9 @@ mod tests {
         let mut scene = scene_from_csv("►,▷");
         let before = scene.touch_state();
         assert_eq!(before.players, 2);
-        scene.game.begin_actions(&[Action::Move(Dir4::East), Action::Stall]);
+        scene
+            .game
+            .begin_actions(&[Action::Move(Dir4::East), Action::Stall]);
         assert!(scene.game.is_animating());
         assert!(!scene.card_visible());
         let lost = scene.touch_state();
@@ -655,7 +716,9 @@ mod tests {
     fn interrupting_touch_clears_buffered_moves_but_preserves_the_current_turn() {
         let mut scene = scene_from_csv(".,.,.\n.,▲,.\n.,.,.");
         scene.game.begin_actions(&[Action::Move(Dir4::East)]);
-        scene.game.try_begin_actions(vec![Action::Move(Dir4::South)]);
+        scene
+            .game
+            .try_begin_actions(vec![Action::Move(Dir4::South)]);
         scene.pending[Player::Player1] = Some(PendingAction {
             action: Action::Move(Dir4::West),
             synced: true,
@@ -706,8 +769,7 @@ mod tests {
         assert_eq!(scene.death, None);
 
         // Restart before the fatal animation delivers its death event.
-        scene.game.restart();
-        scene.after_rewind();
+        scene.rewind_to_start();
         assert_eq!(scene.outcome(), None);
         assert_eq!(scene.death, None);
 
