@@ -6,26 +6,30 @@ serve it from source using the [README instructions](../README.md).
 
 ## Playing
 
-Tap **Tap to play** after loading, then **OK** to begin. The initial tap also
+Tap **Tap to play** after loading, then **Play** to begin. The initial tap also
 allows the browser to start audio. The game is turn based, so there is no need
 to rush between moves.
 
 | Control | Action |
 | --- | --- |
-| Directional pad | Move the selected hero. Tap for a step or hold to repeat. You can slide between directions. |
+| Directional pad | Move the selected hero. Tap for a step or hold to repeat. You can slide between directions. The center is inactive. |
 | Wait | Pass a turn without moving. In two-hero rooms, it supplies a wait for both heroes. |
-| OK | Start, enter a selected room, choose a menu item or continue after winning. |
+| Play / Enter room / Select / Close | Contextual confirmation on the title, map, menu or code screen. During gameplay, Continue is on the win card. |
 | Undo | Take back a move or a restart. |
 | Restart | Tap twice within two seconds to start a fresh, undoable attempt. |
-| 1 / 2 | Choose the hero controlled by the directional pad. In solo rooms, either selection controls the same hero. |
-| Sync | Queue directions for a simultaneous two-hero turn. |
+| Blue / orange portrait | Choose the hero controlled by the directional pad. A matching ring marks that hero on the board. Shown only in two-hero rooms. |
+| Move together | Queue directions for a simultaneous two-hero turn. Shown only in two-hero rooms. |
 | Menu (☰) | Open the game's menu. |
 | Controls (▤) | Hide or show the touch dock. |
 | Fullscreen (⛶) | Enter or leave fullscreen when supported by the browser. |
 | Help (?) | Open the touch-control guide. |
 
 The game's own menu buttons and map rooms also accept direct taps. Drag the
-map to explore it. The pad and OK provide another way to navigate menus.
+map to explore it. The pad and Select provide another way to navigate menus.
+Restart, Wait and Undo share the same style in the right-hand column, from top
+to bottom. Unavailable actions become disabled without moving the other buttons.
+Undo stays in its normal position after winning or losing. Wait never becomes
+a Continue button.
 
 Restart preserves the previous attempt. If you make moves after restarting,
 Undo takes those back first; the next Undo restores the position you had before
@@ -35,31 +39,33 @@ making any moves adds no extra undo step. The move counter and exported solution
 describe only the current attempt. Leaving the room or reloading starts a new
 undo history; completed-room progress stays saved.
 
-### Two heroes and Sync
+### Two heroes and Move together
 
-For an ordinary move, leave Sync off and select the hero to move. For a
-simultaneous turn, turn Sync on, select hero 1 and tap a direction, then select
+For an ordinary move, leave Move together off and select the hero to move. For a
+simultaneous turn, turn Move together on, select hero 1 and tap a direction, then select
 hero 2 and tap their direction. Both heroes can then take their queued turns
 together. Release the direction button before switching heroes.
 
-Sync uses the game's existing synchronized-input behavior. Turning it off
-changes subsequent input; it **does not clear a direction already queued in
-the game**. Choose another direction to replace that hero's queued input. With
-the direction buttons released, Wait supplies waiting inputs for both heroes.
+Move together uses the game's synchronized-input behavior. Turning it off
+clears queued future moves. Switching portraits preserves queued moves, so
+each hero can contribute a direction to the same turn. With the direction
+buttons released, Wait supplies waiting inputs for both heroes.
 
 Disconnect physical gamepads when using the touch buttons for both heroes.
 The original input system changes keyboard-to-hero routing when a gamepad is
 connected, and the touch pad sends those same keyboard inputs. Hero 1 uses the
-arrow keys and right Shift for Sync; hero 2 uses WASD and left Shift. The
+arrow keys and right Shift for synchronized input; hero 2 uses WASD and left Shift. The
 adapter intentionally preserves this existing game input model.
 
 ## Layout and room tips
 
-The bottom dock is about 151 CSS pixels high in its standard layout, with
-44-pixel-high primary controls. At widths up to 700 pixels, it uses the
-available phone width. On landscape screens up to 600 pixels high, the dock
-moves to a 160-pixel-wide side column. The surrounding page also accounts for
-device safe areas.
+The bottom dock is 151 CSS pixels high in solo rooms, with 44-pixel-high primary
+controls. Two-hero rooms add one 44-pixel utility row and a 6-pixel gap. The
+layout uses the room's initial hero count, so a hero dying, an outcome card or
+a tip appearing cannot resize it. The controls fill the available phone width,
+with 10-pixel side padding and a 562-pixel maximum inner width on larger screens.
+On landscape screens up to 600 pixels high, the dock moves to a 272-pixel-wide
+side column. The surrounding page also accounts for device safe areas.
 
 When the game uses its portrait layout and the touch controls are ready and
 visible, level scenes reclaim the space used by the original lower instruction
@@ -94,24 +100,31 @@ builds keep the original HUD and tutorial presentation.
 | `touch.css` | Compact responsive dock, safe areas and independent tip overlay. |
 | `js/touch-controls.js` | Pointer input, hero selection, Sync modifiers and keyboard-event dispatch to the canvas. |
 | `js/touch-shell.js` | Loading, audio activation, visibility, fullscreen, help and the JavaScript side of the game bridge. |
+| `js/touch-state.js` | Scene-aware action availability, hero controls, contextual labels and input cancellation. |
 | `js/touch-tips.js` | Tip identity, typewriter text, dismissal, suppression and scroll restoration. |
-| `game/src/touch_ui.rs` | WebAssembly imports for control visibility and authored tip text, with native fallbacks. |
-| `game/src/scenes/level.rs` | Level layout adjustment and publication of the current room tip. |
+| `game/src/touch_ui.rs` | WebAssembly imports for dock state, selected hero, input cancellation, visibility and authored tip text, with native fallbacks. |
+| `game/src/scenes/level.rs` | Level layout adjustment, action availability and publication of the current room tip. |
+| `game/src/render/board.rs` | Matching selection ring on the touch-controlled hero. |
 | `game/src/render/ui.rs` | Reclaims the portrait instruction panel's space for the board. |
 | `game/src/scenes/level/hud.rs` | Omits the replaced panel and its pointer targets. |
-| `game/src/app.rs` | Coordinates tip visibility with scenes, menus and transitions. |
+| `game/src/app.rs` | Publishes scene state and coordinates tip visibility and input cancellation with scenes, menus and transitions. |
 | `tests/touch-controls.test.cjs` | Input lifecycle and queue regression tests. |
 | `tests/touch-tips.test.cjs` | Tip content, visibility, identity and scroll regression tests. |
+| `tests/touch-state.test.cjs` | Hero-row gating, contextual actions, outcome states and cancellation regression tests. |
 
 The pointer adapter keeps short taps active for at least 80 milliseconds and
 two animation frames so the game's polling loop can see them. It separates
 rapid taps, tracks ownership when several fingers share a button, and
 serializes directions per hero to avoid unintended direction chords. Undo,
-Restart, Menu and OK cancel buffered movement. Cancellation, focus loss,
-backgrounding and resizing release held input.
+Restart, Menu and confirmation cancel buffered touch movement. Cancellation,
+focus loss, backgrounding and resizing release held input. A monotonically
+increasing input epoch also tells the engine to discard queued future moves
+when the scene changes or interaction is interrupted, while preserving the
+currently resolved turn and its animation. Changing available Undo/Restart
+flags alone does not cancel input or disrupt the two-tap Restart confirmation.
 
 The web page and WebAssembly binary should be built and served from the same
-revision. The updated game imports the visibility and tip callbacks registered
+revision. The updated game imports the state, visibility and tip callbacks registered
 by the page. `./serve.sh` builds the binary at the path used by `index.html`.
 
 ## Validation and browser limits
@@ -119,7 +132,7 @@ by the page. `./serve.sh` builds the binary at the path used by `index.html`.
 Run the JavaScript regression tests from the repository root:
 
 ```sh
-node --test tests/touch-controls.test.cjs tests/touch-tips.test.cjs
+node --test tests/touch-controls.test.cjs tests/touch-tips.test.cjs tests/touch-state.test.cjs
 ```
 
 Build and run the web game with the normal source workflow:
@@ -130,7 +143,7 @@ rustup target add wasm32-unknown-unknown
 ```
 
 For a device check, exercise quick taps, held movement, direction changes,
-Undo, the two-tap restart, hero switching and Sync. In portrait gameplay, open
+Undo, the two-tap restart, hero switching and Move together. In portrait gameplay, open
 and minimize a long tip and step onto or away from a tutorial trigger: the
 board should stay at the same position and scale. Check rotating, hiding and
 showing controls, opening menus, and returning after the browser has been
@@ -145,5 +158,5 @@ performance or compatibility on a physical phone.
 
 Some original tutorial wording still names keyboard keys. Very short screens
 can leave menus cramped; try portrait, hide the controls, or navigate with the
-pad and OK. Progress uses this site's browser storage and is separate from
+pad and Select. Progress uses this site's browser storage and is separate from
 progress on the original upstream site or another hosting origin.
