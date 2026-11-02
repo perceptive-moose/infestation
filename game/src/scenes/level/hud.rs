@@ -852,6 +852,10 @@ fn menu_button_rect(top: Rect, s: f32) -> Rect {
 }
 /// The portrait-mode button bar: Undo, Wait, Restart, Menu.
 fn portrait_bar(layout: &ScreenLayout) -> Vec<(Rect, UiAction)> {
+    // Hidden controls must not leave clickable targets over the enlarged board.
+    if layout.panel.h == 0.0 {
+        return Vec::new();
+    }
     let s = layout.s;
     let p = layout.panel;
     let pad = 10.0 * s;
@@ -930,6 +934,10 @@ fn draw_portrait_hud(sprites: &Sprites, scene: &LevelScene, ctx: &Ctx, layout: &
             20.0 * s,
             TEXT,
         );
+    }
+    // The title/status header above stays even when the secondary panel is gone.
+    if layout.panel.h == 0.0 {
+        return;
     }
     ui::panel(layout.panel, s);
     let bar = portrait_bar(layout);
