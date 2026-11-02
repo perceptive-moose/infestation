@@ -186,6 +186,7 @@ fn screenshots() {
         audio.sfx_volume = 0.0;
         let hints = match std::env::var("HINTS").as_deref() {
             Ok("pad") => InputHints::Controller(quad_gamepad::ControllerType::PlayStation),
+            Ok("touch") => InputHints::Touch,
             _ => InputHints::Keyboard,
         };
 

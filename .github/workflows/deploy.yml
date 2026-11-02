@@ -55,6 +55,7 @@ jobs:
           test -s dist/js/touch-shell.js
           test -s dist/js/touch-tips.js
           test -s dist/js/touch-state.js
+          test -s dist/js/input-mode.js
           test -s dist/assets/sprites.png
 
       - name: Upload artifact

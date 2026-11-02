@@ -7,6 +7,7 @@ This fork adds touchscreen controls and a mobile layout to
 the original game, levels, artwork and audio, with changes to the web interface
 and the game's portrait HUD.
 
+Play this version at https://perceptive-moose.github.io/infestation/.
 Play the original upstream version at https://davidspies.github.io/infestation.
 Build and serve this fork locally, or publish a playable copy with
 [GitHub Pages](#publish-with-github-pages) using the instructions below.
@@ -15,6 +16,10 @@ AI Disclaimer: This game uses entirely AI-generated artwork, music and sound eff
 
 ## Touchscreen support
 
+- Prompts and tutorial notes follow the input you use: touch, keyboard or
+  controller. Phones start with touch controls; using a physical keyboard,
+  mouse or controller restores its instructions. Touching the game switches
+  back. The Help guide follows the same input mode.
 - A classic directional pad with an inactive center, beside matching Restart,
   Wait and Undo buttons. The controls expand across phone widths and move to
   a side dock on short landscape screens.
@@ -31,11 +36,11 @@ AI Disclaimer: This game uses entirely AI-generated artwork, music and sound eff
   reposition the board.
 - Direct taps on the game's menus and map, audio activation on a real gesture,
   a controls toggle, and fullscreen where the browser supports it. Keyboard
-  controls remain available, and native builds retain their original HUD.
+  and controller controls remain available, and native builds retain their original HUD.
 - Undoable restarts: undo past the moves in a fresh attempt to restore the
   previous one, then keep undoing through earlier moves and restarts.
 
-See the [touchscreen guide](docs/TOUCHSCREEN.md) for controls, two-hero caveats,
+See the [touchscreen guide](docs/TOUCHSCREEN.md) for controls, input switching,
 implementation details and device checks.
 
 ## Development
@@ -77,10 +82,10 @@ The JavaScript tests use Node.js's built-in test runner and require no npm
 packages:
 
 ```sh
-node --test tests/touch-controls.test.cjs tests/touch-tips.test.cjs tests/touch-state.test.cjs
+node --test tests/touch-controls.test.cjs tests/touch-tips.test.cjs tests/touch-state.test.cjs tests/input-mode.test.cjs
 ```
 
-These cover input handling, adaptive controls and room-tip state. Also test the served game on
+These cover input handling, device detection, adaptive controls and room-tip state. Also test the served game on
 physical phones: the Node tests do not exercise WebGL rendering, browser audio,
 fullscreen or device-specific touch behavior. The web game requires a browser
 with WebAssembly and working WebGL graphics support.
@@ -124,5 +129,6 @@ changing them:
 `SHOTS_DIR=/tmp/shots cargo test -r -p infestation screenshots -- --ignored --test-threads=1`
 renders scripted scenes (title, levels, effects frame by frame, the world map
 and a full title-to-map-to-level flow) to PNGs for visual review. `W`/`H` set
-the window size, `HINTS=pad` controller prompts, and `ONLY=` a
+the window size, `HINTS=pad` controller prompts, `HINTS=touch` touch prompts,
+and `ONLY=` a
 comma-separated list of shot name prefixes.
