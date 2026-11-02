@@ -21,7 +21,9 @@ AI Disclaimer: This game uses entirely AI-generated artwork, music and sound eff
 - Hero portraits and Move together appear only in two-hero rooms. Play and
   menu confirmation appear only on the relevant screens; Continue stays on
   the win card. The dock keeps the same geometry throughout a room.
-- Drag the settings sliders and scroll the settings panel on smaller screens.
+- Drag the settings sliders, scroll the settings panel on smaller screens,
+  and choose which side holds the D-pad. The control-side preference is saved
+  alongside the existing audio and screen-shake preferences.
 - In portrait gameplay, the touch dock replaces the duplicate instruction
   panel, giving its space back to the puzzle. Room tips appear in a scrollable,
   dismissible overlay; opening, closing or typing a tip does not resize or

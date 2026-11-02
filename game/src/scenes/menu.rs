@@ -22,6 +22,7 @@ pub(crate) enum MenuItem {
     Music,
     Sound,
     Shake,
+    TouchLayout,
     Export,
     Import,
     Title,
@@ -147,6 +148,9 @@ impl Menu {
             items.extend([MenuItem::Restart, MenuItem::WorldMap]);
         }
         items.extend([MenuItem::Music, MenuItem::Sound, MenuItem::Shake]);
+        if cfg!(target_arch = "wasm32") {
+            items.push(MenuItem::TouchLayout);
+        }
         items.extend([MenuItem::Export, MenuItem::Import]);
         if !in_level {
             items.push(MenuItem::Title);
@@ -298,8 +302,18 @@ impl Menu {
         ctx.audio.play(Sfx::UiMove);
     }
 
+    fn set_dpad_right(&self, right: bool, ctx: &mut Ctx) {
+        if ctx.settings.touch_dpad_right != right {
+            ctx.settings.touch_dpad_right = right;
+            ctx.settings.save();
+            ctx.audio.play(Sfx::UiMove);
+        }
+    }
+
     fn adjust(&self, item: MenuItem, delta: f32, ctx: &mut Ctx) {
-        if let Some(current) = slider_value(item, ctx.settings) {
+        if item == MenuItem::TouchLayout {
+            self.set_dpad_right(delta > 0.0, ctx);
+        } else if let Some(current) = slider_value(item, ctx.settings) {
             self.set_slider(item, current + delta, ctx);
         }
     }
@@ -314,6 +328,10 @@ impl Menu {
             MenuItem::Import => MenuChoice::Import,
             MenuItem::Title => MenuChoice::Title,
             MenuItem::Quit => MenuChoice::Quit,
+            MenuItem::TouchLayout => {
+                self.set_dpad_right(!ctx.settings.touch_dpad_right, ctx);
+                return None;
+            }
             MenuItem::Music | MenuItem::Sound | MenuItem::Shake => {
                 let on = slider_value(item, ctx.settings).expect("a slider") > 0.0;
                 self.set_slider(item, if on { 0.0 } else { 1.0 }, ctx);
@@ -434,6 +452,14 @@ impl Menu {
                 MenuItem::Music => (SpriteId::IconMusic, "Music"),
                 MenuItem::Sound => (SpriteId::IconSound, "Sound"),
                 MenuItem::Shake => (SpriteId::IconGear, "Screen shake"),
+                MenuItem::TouchLayout => (
+                    SpriteId::IconGear,
+                    if ctx.settings.touch_dpad_right {
+                        "D-pad: right"
+                    } else {
+                        "D-pad: left"
+                    },
+                ),
                 MenuItem::Export => (SpriteId::IconExport, "Export progress"),
                 MenuItem::Import => (SpriteId::IconImport, "Import progress"),
                 MenuItem::Title => (SpriteId::IconDoor, "Title screen"),
@@ -700,7 +726,7 @@ mod tests {
             MenuItem::Music,
             MenuItem::Sound,
             MenuItem::Shake,
-            MenuItem::Title,
+            MenuItem::TouchLayout,
             MenuItem::Export,
             MenuItem::Import,
         ];
@@ -882,17 +908,17 @@ mod tests {
             menu.pointer_action(&PointerEvent::Up { start, end }, &scrolled),
             None
         );
-        let hidden_item = scrolled.rows[6].center();
-        assert_eq!(scrolled.row_at(hidden_item), Some(6));
+        let side_setting = scrolled.rows[6].center();
+        assert_eq!(scrolled.row_at(side_setting), Some(6));
         assert_eq!(
-            menu.pointer_action(&PointerEvent::Down(hidden_item), &scrolled),
+            menu.pointer_action(&PointerEvent::Down(side_setting), &scrolled),
             None
         );
         assert_eq!(
             menu.pointer_action(
                 &PointerEvent::Up {
-                    start: hidden_item,
-                    end: hidden_item
+                    start: side_setting,
+                    end: side_setting
                 },
                 &scrolled
             ),

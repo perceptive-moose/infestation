@@ -43,6 +43,7 @@
         let player = "p1";
         let sync = false;
         let inputEpoch = 0;
+        let dpadRight = false;
 
         function interrupt() {
             // The engine also clears pending synchronized moves on a new epoch.
@@ -132,6 +133,14 @@
         return {
             update,
             interrupt,
+            setDpadRight(value) {
+                value = Boolean(value);
+                if (dpadRight === value) return;
+                // Stop a held gesture before its button moves to the other side.
+                interrupt();
+                dpadRight = value;
+                root.classList.toggle("dpad-right", value);
+            },
             setAvailable(value) {
                 value = Boolean(value);
                 if (available === value) return;

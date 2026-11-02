@@ -39,12 +39,18 @@ making any moves adds no extra undo step. The move counter and exported solution
 describe only the current attempt. Leaving the room or reloading starts a new
 undo history; completed-room progress stays saved.
 
-### Settings
+### Settings and control sides
 
 Open the game menu with **☰**. Drag the **Music**, **Sound**, or **Screen shake**
 bar to adjust it, or tap a point on the bar. Values keep their existing eleven
 steps from 0 through 10. A slider stays attached to the gesture that started
 on it, so releasing outside the bar cannot activate another menu item.
+
+Tap **D-pad: left** or **D-pad: right** to swap the directional pad and the
+Restart / Wait / Undo column. The hero selectors follow the D-pad in two-hero
+rooms. This preference is saved with the game's settings and restored on the
+next visit; existing saves keep the D-pad on the left until you change it.
+Swapping sides keeps the dock and game area the same size.
 
 On smaller screens, swipe the settings list outside a slider to scroll to
 the remaining options. A mouse wheel also scrolls, and D-pad or keyboard
@@ -113,9 +119,11 @@ builds keep the original HUD and tutorial presentation.
 | `js/touch-shell.js` | Loading, audio activation, visibility, fullscreen, help and the JavaScript side of the game bridge. |
 | `js/touch-state.js` | Scene-aware action availability, hero controls, contextual labels and input cancellation. |
 | `js/touch-tips.js` | Tip identity, typewriter text, dismissal, suppression and scroll restoration. |
-| `game/src/touch_ui.rs` | WebAssembly imports for dock state, selected hero, input cancellation, visibility and authored tip text, with native fallbacks. |
+| `game/src/touch_ui.rs` | WebAssembly imports for dock state, control-side preference, selected hero, input cancellation, visibility and authored tip text, with native fallbacks. |
 | `game/src/scenes/level.rs` | Level layout adjustment, action availability and publication of the current room tip. |
 | `game/src/render/board.rs` | Matching selection ring on the touch-controlled hero. |
+| `game/src/scenes/menu.rs` | Draggable sliders, scrollable settings and the control-side setting. |
+| `game/src/settings.rs` | Saved audio, screen-shake, control-side and map preferences. |
 | `game/src/render/ui.rs` | Reclaims the portrait instruction panel's space for the board. |
 | `game/src/scenes/level/hud.rs` | Omits the replaced panel and its pointer targets. |
 | `game/src/app.rs` | Publishes scene state and coordinates tip visibility and input cancellation with scenes, menus and transitions. |
