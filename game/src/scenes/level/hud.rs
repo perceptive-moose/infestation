@@ -975,7 +975,7 @@ fn draw_portrait_hud(sprites: &Sprites, scene: &LevelScene, ctx: &Ctx, layout: &
         draw_dialogue(sprites, scene, space, s, true);
     } else {
         let hint = match ctx.hints {
-            InputHints::Touch => "Show the touch controls above to move.",
+            InputHints::Touch => "Open the menu to show on-screen controls.",
             InputHints::Keyboard => "Arrows or WASD to move. Space waits a turn.",
             InputHints::Controller(_) => "D-pad or stick to move.",
         };

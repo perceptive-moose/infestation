@@ -20,6 +20,12 @@ test("phones start in touch mode while fine-pointer hybrids start in keyboard mo
     const mode = create({ touchDefault: true });
     assert.equal(mode.code(), MODE.touch);
     assert.equal(mode.controlsVisible(), true);
+    mode.setControlsPreference(null);
+    assert.equal(mode.controlsVisible(), true);
+    const desktop = create();
+    desktop.setControlsPreference(null);
+    assert.equal(desktop.controlsVisible(), false);
+    assert.equal(desktop.mode(), "keyboard");
 });
 
 test("real keyboard, touch, mouse and pen input change prompts without resizing the dock", () => {
@@ -124,7 +130,7 @@ test("a second controller can select controller prompts and disconnect restores 
 
 test("hiding the dock retains touch prompts and stays hidden across device changes", () => {
     const mode = create({ touchDefault: true });
-    mode.toggleControls();
+    mode.setControlsPreference(false);
     assert.equal(mode.controlsVisible(), false);
     assert.equal(mode.mode(), "touch");
     mode.pointer(touch);
@@ -135,9 +141,9 @@ test("hiding the dock retains touch prompts and stays hidden across device chang
     assert.equal(mode.controlsVisible(), false);
 });
 
-test("manually showing controls opts into touch prompts and remains stable on dock interactions", () => {
+test("showing controls in settings opts into touch prompts and remains stable on dock interactions", () => {
     const mode = create();
-    mode.toggleControls();
+    mode.setControlsPreference(true);
     assert.equal(mode.controlsVisible(), true);
     assert.equal(mode.mode(), "touch");
     mode.pointer(mouse, true);
@@ -145,6 +151,43 @@ test("manually showing controls opts into touch prompts and remains stable on do
     assert.equal(mode.controlsVisible(), true);
     mode.keyboard(key);
     assert.equal(mode.controlsVisible(), true);
+});
+
+test("saved visibility overrides device defaults and can return to those defaults", () => {
+    for (const touchDefault of [true, false]) {
+        const mode = create({ touchDefault });
+        mode.setControlsPreference(false);
+        assert.equal(mode.controlsVisible(), false);
+        mode.setControlsPreference(true);
+        assert.equal(mode.controlsVisible(), true);
+        assert.equal(mode.mode(), "touch");
+        mode.setControlsPreference(null);
+        assert.equal(mode.controlsVisible(), touchDefault);
+    }
+});
+
+test("repeated saved visibility publication cannot override the active input device", () => {
+    const changes = [];
+    const mode = create({ touchDefault: true, onChange: state => changes.push(state) });
+    mode.keyboard(key);
+    // Explicitly saving shown selects touch even when the device default
+    // already had the controls visible.
+    mode.setControlsPreference(true);
+    assert.equal(mode.mode(), "touch");
+    mode.keyboard(key);
+    for (let frame = 0; frame < 120; frame += 1) mode.setControlsPreference(true);
+    assert.equal(mode.mode(), "keyboard");
+    assert.equal(mode.controlsVisible(), true);
+    assert.equal(changes.length, 3);
+    mode.gamepads([pad({ buttons: [true] })]);
+    for (let frame = 0; frame < 120; frame += 1) mode.setControlsPreference(true);
+    assert.equal(mode.mode(), "controller");
+    assert.equal(changes.length, 4);
+    mode.setControlsPreference(false);
+    for (let frame = 0; frame < 120; frame += 1) mode.setControlsPreference(false);
+    assert.equal(mode.controlsVisible(), false);
+    assert.equal(mode.mode(), "controller");
+    assert.equal(changes.length, 5);
 });
 
 test("unchanged input does not repeatedly cancel or relayout the game", () => {

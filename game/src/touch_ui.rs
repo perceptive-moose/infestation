@@ -50,6 +50,7 @@ unsafe extern "C" {
     fn infestation_touch_selected_player() -> u32;
     fn infestation_touch_input_epoch() -> u32;
     fn infestation_touch_layout(dpad_right: u32);
+    fn infestation_touch_visibility(preference: i32);
     fn infestation_touch_state(
         room_ptr: *const u8,
         room_len: u32,
@@ -86,6 +87,16 @@ pub(crate) fn set_layout(dpad_right: bool) {
     }
     #[cfg(not(target_arch = "wasm32"))]
     let _ = dpad_right;
+}
+
+/// None preserves the browser's device default until the player makes a choice.
+pub(crate) fn set_visibility(preference: Option<bool>) {
+    #[cfg(target_arch = "wasm32")]
+    unsafe {
+        infestation_touch_visibility(preference.map_or(-1, i32::from));
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    let _ = preference;
 }
 
 /// The page copies the room name synchronously; it never keeps a WASM pointer.
