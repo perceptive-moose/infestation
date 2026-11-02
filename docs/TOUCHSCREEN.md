@@ -200,9 +200,11 @@ by the page. `./serve.sh` builds the binary at the path used by `index.html`.
 
 ## Validation and browser limits
 
-Run the JavaScript regression tests from the repository root:
+Run the regression tests from the repository root. The Rust build also prepares
+the browser runtime used by the shell integration tests:
 
 ```sh
+cargo test --locked -p infestation -p scenario_tests --lib
 node --test tests/*.test.cjs
 ```
 
