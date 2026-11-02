@@ -43,14 +43,14 @@ function setup() {
     const players = [elements.p1, elements.p2];
     players.forEach((element, i) => { element.dataset.player = "p" + (i + 1); });
     const directions = [elements.up, elements.down, elements.left, elements.right];
-    const root = {
+    const root = Object.assign(new Element(), {
         querySelector(selector) {
             const key = selector.startsWith("#") ? selector.slice(1)
                 : selector.slice('[data-code="'.length, -2);
             return elements[key] || null;
         },
         querySelectorAll(selector) { return selector === "[data-player]" ? players : directions; }
-    };
+    });
     const controls = {
         releases: 0, player: "p1", sync: false,
         releaseAll() { this.releases += 1; },
@@ -65,8 +65,10 @@ function setup() {
         api.update({ room: "Planks", screen: SCREEN.playing, players: 1,
             actions: ACTION.direction | ACTION.wait, ...changes });
     }
-    function resetWrites() { for (const element of Object.values(elements)) element.writes.length = 0; }
-    return { elements, directions, controls, changes, api, room, resetWrites };
+    function resetWrites() {
+        for (const element of [root, ...Object.values(elements)]) element.writes.length = 0;
+    }
+    return { root, elements, directions, controls, changes, api, room, resetWrites };
 }
 
 test("loading offers no active game actions or premature two-hero controls", () => {
@@ -237,6 +239,51 @@ test("leaving a code dialog restores ordinary menu confirmation after its direct
     s.api.update({ room: "", screen: SCREEN.menu, players: 0, actions: ACTION.direction | ACTION.confirm });
     assert.equal(s.elements["context-label"].textContent, "Select");
     assert.equal(s.elements["context-confirm"].dataset.code, "Enter");
+});
+
+test("saved D-pad side restores and changing it cancels input before the layout moves", () => {
+    const s = setup();
+    assert.equal(s.root.classes.has("dpad-right"), false);
+    const epoch = s.api.inputEpoch();
+    const releases = s.controls.releases;
+    s.api.setDpadRight(true);
+    assert.equal(s.root.classes.has("dpad-right"), true);
+    assert.equal(s.api.inputEpoch(), epoch + 1);
+    assert.equal(s.controls.releases, releases + 1);
+    s.api.setDpadRight(false);
+    assert.equal(s.root.classes.has("dpad-right"), false);
+    assert.equal(s.api.inputEpoch(), epoch + 2);
+    assert.equal(s.controls.releases, releases + 2);
+});
+
+test("D-pad side survives room, menu, outcome and control-visibility changes", () => {
+    const s = setup();
+    s.api.setDpadRight(true);
+    s.room({ players: 2 });
+    s.api.setAvailable(true);
+    s.room({ players: 2, screen: SCREEN.menu, actions: ACTION.direction });
+    assert.equal(s.root.classes.has("dpad-right"), true);
+    s.room({ players: 2, screen: SCREEN.lost, actions: ACTION.undo | ACTION.restart });
+    assert.equal(s.root.classes.has("dpad-right"), true);
+    s.room({ room: "Another room", players: 1 });
+    s.api.setAvailable(false);
+    s.api.setAvailable(true);
+    assert.equal(s.root.classes.has("dpad-right"), true);
+});
+
+test("repeated saved-layout publications do not rewrite the DOM or cancel input", () => {
+    const s = setup();
+    s.api.setDpadRight(true);
+    s.room({ players: 2 });
+    s.api.setAvailable(true);
+    s.resetWrites();
+    const epoch = s.api.inputEpoch();
+    const releases = s.controls.releases;
+    for (let i = 0; i < 120; i += 1) s.api.setDpadRight(true);
+    assert.equal(s.api.inputEpoch(), epoch);
+    assert.equal(s.controls.releases, releases);
+    assert.deepEqual(s.root.writes, []);
+    for (const element of Object.values(s.elements)) assert.deepEqual(element.writes, []);
 });
 
 test("welcome, help and hidden controls disable input without changing room geometry", () => {
