@@ -19,8 +19,9 @@ AI Disclaimer: This game uses entirely AI-generated artwork, music and sound eff
   Wait and Undo buttons. The controls expand across phone widths and move to
   a side dock on short landscape screens.
 - Hero portraits and Move together appear only in two-hero rooms. Play and
-  menu confirmation appear only on the relevant screens; Continue stays on
-  the win card. The dock keeps the same geometry throughout a room.
+  Enter room appear on the title and map screens; Continue stays on the win
+  card. Settings use direct taps, without a redundant Select button. The dock
+  keeps the same geometry throughout a room.
 - Drag the settings sliders, scroll the settings panel on smaller screens,
   and choose which side holds the D-pad. The control-side preference is saved
   alongside the existing audio and screen-shake preferences.

@@ -14,7 +14,6 @@
     const CONTEXT = {
         [SCREEN.title]: ["Play", "Begin exploring the keep."],
         [SCREEN.map]: ["Enter room", "Choose a room on the map."],
-        [SCREEN.menu]: ["Select", "Use the arrows or tap a menu item."],
         [SCREEN.code]: ["Close", "Return to the game."]
     };
 
@@ -60,7 +59,7 @@
             // A room's INITIAL player count owns this row's geometry. Outcomes,
             // menus and temporary disabled actions must not collapse it.
             heroes.hidden = !twoHeroes;
-            playActions.hidden = Boolean(context);
+            playActions.hidden = Boolean(context) || state.screen === SCREEN.menu;
             contextActions.hidden = !context;
             for (const button of directions) button.disabled = !enabled(ACTION.direction);
             wait.disabled = !playing || !enabled(ACTION.wait);
