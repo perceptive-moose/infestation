@@ -1,0 +1,141 @@
+{
+  "repository": "perceptive-moose/infestation",
+  "old_head": "48e5832d2f130646427159149bff3b22a74f304d",
+  "new_head": "d048d86fabc423ef6e5e30ad488efe648d4f1d32",
+  "upstream": "a6ef414767b61977056df2b033e55334d4ff7180",
+  "tree": "5dcd4c2cfc990ce52ca8071dbfce4b2800af10fe",
+  "candidate_ref": "refs/heads/cleaner-commit-messages",
+  "bundle_sha256": "faed4c8db346dfe5655ee2418369841678770674c1396f27e6192c2a2b572e13",
+  "commits": [
+    {
+      "old": "c0c11bff579f2bb3604691d7ea9371ac3439242b",
+      "new": "16389505bc2fed27880d45c7eea1959d51ee2723",
+      "subject": "Add a touch input adapter with pointer and key ownership tests"
+    },
+    {
+      "old": "1f8a08fe01d5ca6099f75dd6a96b2629c422b166",
+      "new": "343071eabe4a776a1e3c1b388521e69801857253",
+      "subject": "Add the mobile browser shell and publish its complete assets"
+    },
+    {
+      "old": "49fac1a1dc66cb717831586025fbbebba8642da2",
+      "new": "c5412a860b50af9f628aad6d0adb338f63c1229f",
+      "subject": "Keep the portrait puzzle stationary while displaying room tips"
+    },
+    {
+      "old": "10d1343c6f5fce7275ad50fcb3b240bef9beb2d6",
+      "new": "ebf2ba723afabb1335908084af8297c1c33cf37b",
+      "subject": "Merge PR #1: Add touchscreen controls and GitHub Pages deployment"
+    },
+    {
+      "old": "ae9558fa887cbe16fe7576c44fd95fd01008fa94",
+      "new": "0def6b9d5413f4bacd74ef4851b808191fedda94",
+      "subject": "Preserve previous attempts when restarting a puzzle"
+    },
+    {
+      "old": "58d603df6f318bcc8661f47232bd7e55aabd7108",
+      "new": "82d64b57ca851d236321312546f0972974fb3cfe",
+      "subject": "Expose undoable restarts through level actions and presentation"
+    },
+    {
+      "old": "d120841de4b316399866892854378c41178055a0",
+      "new": "68fc6e8f8a6f21012c2bf5c19e78c637b07f8fd5",
+      "subject": "Merge PR #2: Make restarts undoable"
+    },
+    {
+      "old": "62039102a5352af68f061abe50aadb5f355972fd",
+      "new": "6390ba3e2acc1db496e0482343e9e37addf3bbe2",
+      "subject": "Accept a fresh input press after clearing an interrupted hold"
+    },
+    {
+      "old": "e0925f98ec34b9d6afe006afdfcf4a88fae87001",
+      "new": "21171db84beb40424a2d88824ba5ad1e9844ea8f",
+      "subject": "Release touch holds safely when switching heroes or actions"
+    },
+    {
+      "old": "f8cacbd378a690b6a29ce23592e082f8f15754e0",
+      "new": "fcdf886163ccc59f8e58bb239a76ec31995a3153",
+      "subject": "Adapt the D-pad and action column to the current game state"
+    },
+    {
+      "old": "7bf8590d8814fccf5a7464e3a10e07138a4edb47",
+      "new": "4663c32f8030d334e9946581ea521d66a34a29b8",
+      "subject": "Merge PR #3: Redesign touch controls around movement, wait and undo"
+    },
+    {
+      "old": "5a19f754944545af55390e9648fbd5ecdb1b7f20",
+      "new": "21528b24541a41a9d64a169f148b679b3ea74ac9",
+      "subject": "Make settings sliders draggable and the menu scrollable"
+    },
+    {
+      "old": "c33f7178d326a40001effe2d704fde1515e3bfd6",
+      "new": "81d0204f95abeb801ebfc4a24bb043da1e2f89ae",
+      "subject": "Save and apply the preferred side of the touch D-pad"
+    },
+    {
+      "old": "27d5586a480b45326c898d80fa535dc8a9c7a3e5",
+      "new": "a65bac1d570a3debe618ea018d33f9a131b76677",
+      "subject": "Remove redundant Select from the touch settings dock"
+    },
+    {
+      "old": "059931fe0040abb2f63ee2389b960d7af60db14f",
+      "new": "71d596e38ad6ad443aac1ee30a8858aa89d30cf6",
+      "subject": "Merge PR #4: Make settings draggable and allow swapping touch controls"
+    },
+    {
+      "old": "2addceffc3ff1a4440d0e0edcd0982c98b06288a",
+      "new": "30ed16d8ec8741406d20abb75cc3c47b3c897dec",
+      "subject": "Remove touch-demo branding from the game shell"
+    },
+    {
+      "old": "416b369597def44ae230aa3ff4c422d879134c1c",
+      "new": "c89aa89b16e063a7f5d34852132b7bd9bedb9bc0",
+      "subject": "Match instructions and hero routing to the active input device"
+    },
+    {
+      "old": "d619b6af7abc49cdce428fc3d0c9392de67c7e4e",
+      "new": "1e1e816c41de0e3cc45436eebc5b4b88e364c68e",
+      "subject": "Merge PR #5: Adapt instructions to touch, keyboard and controller input"
+    },
+    {
+      "old": "8513f0ee48a0099bc57eace51ef1cdfec7508e5f",
+      "new": "11b9ca9fd5780373770f40e16e8803d33daba7bc",
+      "subject": "Persist on-screen control visibility in game settings"
+    },
+    {
+      "old": "fed42057b2560a12b424ebc37eb7d5573605f7fa",
+      "new": "d9d5ef02af22dd1e4031f348e314df62426a0299",
+      "subject": "Merge PR #6: Move on-screen controls visibility into saved settings"
+    },
+    {
+      "old": "e06772560e3e5726684b9d26cd8d6efda6ed2955",
+      "new": "6a707d7e971106d59e90af9372c46644b74adca6",
+      "subject": "Keep touch input independent of physical keyboard and controllers"
+    },
+    {
+      "old": "1b06efac9c9871ece8a43cee20f3c0353060a10b",
+      "new": "5e5d22ff78ea3e3037036e3cb34f2aa55d44e184",
+      "subject": "Isolate browser overlays from game input and recover slow loading"
+    },
+    {
+      "old": "b6920f4801c50c7b0c3c706e8394487bec38e6e3",
+      "new": "c08c21a2d93a37c502fefc2edd094a82f15a5798",
+      "subject": "Clear pending synchronized moves when restarting before turn one"
+    },
+    {
+      "old": "416e250a9cdcc18f4db9b604a79d5f5d873d1210",
+      "new": "1e4fcefce912c48410e5bb47c3fda66ab5119431",
+      "subject": "Merge PR #7: Fix browser input isolation and preserve keyboard/controller behavior"
+    },
+    {
+      "old": "05fe49303bbb40916d78883b56266d6005f4bb3b",
+      "new": "5cfba040f5ee72f86b61a95d718e6493a1835d33",
+      "subject": "Enter the original title screen automatically after loading"
+    },
+    {
+      "old": "48e5832d2f130646427159149bff3b22a74f304d",
+      "new": "d048d86fabc423ef6e5e30ad488efe648d4f1d32",
+      "subject": "Merge PR #8: Open the original title screen automatically after loading"
+    }
+  ]
+}
