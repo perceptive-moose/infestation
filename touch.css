@@ -592,6 +592,11 @@ dialog>p{
 .control-guide{
   margin:24px 0
 }
+body:not([data-input-mode="touch"]) [data-input-guide="touch"],
+body:not([data-input-mode="keyboard"]) [data-input-guide="keyboard"],
+body:not([data-input-mode="controller"]) [data-input-guide="controller"]{
+  display:none
+}
 .control-guide>div{
   padding:12px 0;
   border-top:1px solid #392c44

@@ -24,6 +24,15 @@ pub(crate) const UNDO: u32 = 4;
 pub(crate) const RESTART: u32 = 8;
 pub(crate) const CONFIRM: u32 = 16;
 
+/// The browser distinguishes real input from the touch dock's synthetic keys.
+#[cfg(target_arch = "wasm32")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum InputMode {
+    Keyboard,
+    Touch,
+    Controller,
+}
+
 /// Room identity and initial hero count stay attached to an obscured level,
 /// keeping the dock's geometry stable through menus and outcome cards.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -36,6 +45,7 @@ pub(crate) struct State<'a> {
 
 #[cfg(target_arch = "wasm32")]
 unsafe extern "C" {
+    fn infestation_input_mode() -> u32;
     fn infestation_touch_controls_visible() -> u32;
     fn infestation_touch_selected_player() -> u32;
     fn infestation_touch_input_epoch() -> u32;
@@ -56,6 +66,16 @@ unsafe extern "C" {
         shown: u32,
         visible: u32,
     );
+}
+
+/// Browser input polling needs to distinguish touch from synthetic key events.
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn input_mode() -> InputMode {
+    match unsafe { infestation_input_mode() } {
+        1 => InputMode::Touch,
+        2 => InputMode::Controller,
+        _ => InputMode::Keyboard,
+    }
 }
 
 /// The saved game setting is the source of truth for the browser's dock order.

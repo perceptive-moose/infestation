@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#100d16">
   <meta name="description" content="Play Infestation, David Spies’s turn-based puzzle game, with touch, keyboard or controller controls.">
   <title>Infestation</title>
-  <link rel="stylesheet" href="touch.css?v=game-copy">
+  <link rel="stylesheet" href="touch.css?v=adaptive-input">
 </head>
-<body data-wasm-path="target/wasm32-unknown-unknown/release/infestation.wasm?v=game-copy">
+<body data-input-mode="touch" data-wasm-path="target/wasm32-unknown-unknown/release/infestation.wasm?v=adaptive-input">
   <div class="app" id="app">
     <header class="topbar">
       <div class="brand"><strong>INFESTATION</strong></div>
@@ -65,7 +65,7 @@
             <button type="button" class="action" data-code="KeyU" aria-label="Undo last move or restart" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 4-5 5 5 5M3 9h10a7 7 0 0 1 0 14" transform="translate(0 -2)"/></svg><span>Undo</span></button>
           </div>
           <div class="context-actions" id="context-actions" hidden>
-            <button type="button" class="confirm" id="context-confirm" data-code="Enter" disabled><span id="context-label">Play</span><span aria-hidden="true">↵</span></button>
+            <button type="button" class="confirm" id="context-confirm" data-code="Enter" disabled><span id="context-label">Play</span><span aria-hidden="true">→</span></button>
             <p id="context-hint">Tap the game or use the pad.</p>
           </div>
         </div>
@@ -76,7 +76,8 @@
   <dialog id="help" aria-labelledby="help-title">
     <div class="help-heading"><div><div class="eyebrow">FIELD GUIDE</div><h2 id="help-title">How to play</h2></div><button type="button" id="close-help" class="tool" aria-label="Close help">×</button></div>
     <p>Clear each room of rats. Everything moves when you do, so there’s no rush.</p>
-    <dl class="control-guide">
+    <p>Hints follow the input you use. Use ▤ to show or hide the on-screen pad; switching devices keeps your chosen layout.</p>
+    <dl class="control-guide" data-input-guide="touch">
       <div><dt>Directional pad</dt><dd>Move in four directions. Your sword turns with you. Hold to keep moving. The center of the pad is inactive.</dd></div>
       <div><dt>Wait</dt><dd>Pass one turn without moving. In a two-hero room, both heroes wait.</dd></div>
       <div><dt>Undo / Restart</dt><dd>Undo takes back moves and restarts. Tap Restart twice within two seconds to confirm. Undo past the new moves to return to your previous attempt.</dd></div>
@@ -86,7 +87,19 @@
       <div><dt>Room tips</dt><dd>Tips appear above the controls without moving or resizing the puzzle. Scroll a long tip to read it all. Tap − to minimize it, then Room tip to reopen it.</dd></div>
       <div><dt>More room</dt><dd>The game removes its duplicate portrait instruction panel while the touch controls are visible. Use ▤ to hide the touch controls and restore the game's own buttons. The settings panel scrolls when its options need more room.</dd></div>
     </dl>
-    <div class="progress-note"><strong>Your progress</strong><p>This runs the original game and its levels. The game’s own hints still mention keyboard keys. Progress is saved in this browser, separately from the original site. For two heroes using these touch controls, disconnect physical controllers.</p></div>
+    <dl class="control-guide" data-input-guide="keyboard">
+      <div><dt>Move / Wait</dt><dd>Use the arrow keys or WASD to move. Space passes a turn. Everything waits until you act.</dd></div>
+      <div><dt>Undo / Restart</dt><dd>U takes back moves and restarts. Press R twice within two seconds to restart. Undo past the new moves to return to your previous attempt.</dd></div>
+      <div><dt>Two heroes</dt><dd>Without a controller, arrow keys move the blue hero and WASD moves the orange hero. With a controller connected, both key sets move the orange hero. Hold right Shift with arrows or left Shift with WASD to queue a synchronized move. Space makes both heroes wait.</dd></div>
+      <div><dt>Menus / Map</dt><dd>Escape opens the menu. Use directions to choose an item and Enter to confirm, or click directly. Drag the map to explore. Settings sliders support dragging.</dd></div>
+    </dl>
+    <dl class="control-guide" data-input-guide="controller">
+      <div><dt>Move / Wait</dt><dd>Use the D-pad or left stick to move. The bottom or right face button passes a turn. The game shows the matching button symbols for your controller.</dd></div>
+      <div><dt>Undo / Restart</dt><dd>The left or top face button undoes a move or restart. Press the left shoulder button or left trigger twice within two seconds to restart.</dd></div>
+      <div><dt>Two heroes</dt><dd>The first controller moves the blue hero. A second controller or the keyboard moves the orange hero. Hold the right shoulder button to queue a synchronized move, then choose a move for the other hero.</dd></div>
+      <div><dt>Menus / Map</dt><dd>Start opens the menu. Use the D-pad or stick to navigate and the bottom face button to confirm. Directions also adjust settings sliders.</dd></div>
+    </dl>
+    <div class="progress-note"><strong>Your progress</strong><p>Completed rooms and settings are saved in this browser, separately from the original site.</p></div>
     <div class="help-links"><a href="https://github.com/perceptive-moose/infestation" target="_blank" rel="noopener">Touchscreen fork ↗</a><a href="https://github.com/davidspies/infestation" target="_blank" rel="noopener">Original source ↗</a></div>
     <p class="attribution">Original game by David Spies. The game credits its art, music and sound effects as AI generated.</p>
     <button type="button" class="start help-done" id="help-done">Back to the game <span aria-hidden="true">→</span></button>
@@ -99,9 +112,10 @@
   <script src="js/quad-gamepad.js"></script>
   <script src="js/screen-wake.js"></script>
   <script src="js/progress.js"></script>
-  <script src="js/touch-controls.js?v=game-copy"></script>
+  <script src="js/touch-controls.js?v=adaptive-input"></script>
   <script src="js/touch-tips.js"></script>
-  <script src="js/touch-state.js?v=game-copy"></script>
-  <script src="js/touch-shell.js?v=game-copy"></script>
+  <script src="js/touch-state.js?v=adaptive-input"></script>
+  <script src="js/input-mode.js?v=adaptive-input"></script>
+  <script src="js/touch-shell.js?v=adaptive-input"></script>
 </body>
 </html>

@@ -68,6 +68,7 @@ pub(crate) enum InputHints {
     #[default]
     Keyboard,
     Controller(ControllerType),
+    Touch,
 }
 
 /// A player action with metadata from input polling.
@@ -183,6 +184,12 @@ impl InputState {
     /// The device the player last used. Before any input, a connected
     /// controller if there is one.
     pub(crate) fn hints(&self, gamepad: &GamepadContext) -> InputHints {
+        #[cfg(target_arch = "wasm32")]
+        match crate::touch_ui::input_mode() {
+            crate::touch_ui::InputMode::Touch => return InputHints::Touch,
+            crate::touch_ui::InputMode::Keyboard => return InputHints::Keyboard,
+            crate::touch_ui::InputMode::Controller => {}
+        }
         match self.hints {
             InputHints::Keyboard if !self.used_any => {
                 if let Some(gp) = gamepad.gamepad(0)
@@ -199,6 +206,9 @@ impl InputState {
 
     /// Note which device was used this frame.
     pub(crate) fn track_device(&mut self, gamepad: &GamepadContext) {
+        // Browser key events also carry touch-dock actions. Its trusted-event
+        // tracker chooses keyboard/touch mode; keep the last real pad family.
+        #[cfg(not(target_arch = "wasm32"))]
         if get_last_key_pressed().is_some() || is_mouse_button_pressed(MouseButton::Left) {
             self.hints = InputHints::Keyboard;
             self.used_any = true;
@@ -329,20 +339,11 @@ impl InputState {
         dt: f32,
         player_count: usize,
     ) -> EnumMap<Player, Option<PlayerInput>> {
-        let solo = player_count < 2;
-        let second = if solo {
-            Player::Player1
-        } else {
-            Player::Player2
-        };
         let controller_connected = gamepad
             .gamepad(Gamepad::Gamepad1.index())
             .is_some_and(|g| g.is_connected());
-        let arrow_player = if controller_connected {
-            second
-        } else {
-            Player::Player1
-        };
+        let (arrow_player, second) =
+            keyboard_players(player_count, controller_connected, self.hints(gamepad));
 
         let mut result: EnumMap<Player, Option<PlayerInput>> = EnumMap::default();
 
@@ -471,6 +472,25 @@ impl InputState {
             wheel: collector.wheel / WHEEL_UNITS_PER_NOTCH,
         }
     }
+}
+
+/// The touch dock addresses heroes explicitly even with a controller connected.
+fn keyboard_players(
+    player_count: usize,
+    controller_connected: bool,
+    hints: InputHints,
+) -> (Player, Player) {
+    let second = if player_count < 2 {
+        Player::Player1
+    } else {
+        Player::Player2
+    };
+    let arrows = if controller_connected && hints != InputHints::Touch {
+        second
+    } else {
+        Player::Player1
+    };
+    (arrows, second)
 }
 
 impl Default for InputState {
@@ -717,6 +737,38 @@ const ALL_BUTTONS: [GamepadButton; 17] = [
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn touch_heroes_keep_their_identity_with_an_idle_controller_connected() {
+        assert_eq!(
+            keyboard_players(2, true, InputHints::Touch),
+            (Player::Player1, Player::Player2)
+        );
+        assert_eq!(
+            keyboard_players(2, false, InputHints::Touch),
+            (Player::Player1, Player::Player2)
+        );
+    }
+
+    #[test]
+    fn physical_keyboard_routing_and_solo_controls_keep_the_original_behavior() {
+        assert_eq!(
+            keyboard_players(2, true, InputHints::Keyboard),
+            (Player::Player2, Player::Player2)
+        );
+        assert_eq!(
+            keyboard_players(2, false, InputHints::Keyboard),
+            (Player::Player1, Player::Player2)
+        );
+        for hints in [InputHints::Keyboard, InputHints::Touch] {
+            for connected in [false, true] {
+                assert_eq!(
+                    keyboard_players(1, connected, hints),
+                    (Player::Player1, Player::Player1)
+                );
+            }
+        }
+    }
 
     /// How many navigation steps holding a direction for `seconds` gives.
     fn nav_steps(seconds: f32) -> usize {
