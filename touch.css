@@ -463,21 +463,30 @@ canvas{
   margin-left:8px;
   color:var(--gold)
 }
-.welcome{
+.loading{
   position:absolute;
   inset:0;
   display:grid;
   place-items:center;
   padding:18px;
-  background:linear-gradient(180deg,#100b17cc,#130d1ee8);
-  backdrop-filter:blur(5px);
+  background:var(--ink);
   z-index:3
 }
-.welcome-card{
+.loading-message{
   max-width:360px;
   width:100%;
-  padding:24px 18px 20px;
   text-align:center
+}
+.loading h2{
+  color:var(--gold);
+  font-size:20px;
+  margin:0 0 12px
+}
+.loading p{
+  font-size:13px;
+  color:var(--muted);
+  line-height:1.6;
+  margin:0
 }
 .eyebrow{
   color:var(--gold);
@@ -485,22 +494,9 @@ canvas{
   font-weight:750;
   letter-spacing:.22em
 }
-.welcome h1{
-  font-size:clamp(28px,7vw,44px);
-  line-height:1.07;
-  letter-spacing:-.04em;
-  margin:18px 0 14px;
-  font-weight:850
-}
-.welcome-card>p{
-  font-size:13px;
-  color:#c0b0ce;
-  line-height:1.7;
-  margin:0 0 22px
-}
-.start{
+.help-done{
   width:100%;
-  min-height:54px;
+  min-height:48px;
   display:flex;
   align-items:center;
   justify-content:space-between;
@@ -511,25 +507,12 @@ canvas{
   background:var(--gold);
   color:#2a1b11;
   font-weight:750;
-  font-size:15px;
+  font-size:13px;
   touch-action:manipulation
 }
-.start>span:last-child{
+.help-done>span:last-child{
   font-size:23px;
   font-weight:400
-}
-.welcome-card>.welcome-note{
-  font-size:10px;
-  margin:10px 0 20px;
-  color:#ae9abb
-}
-.credit{
-  font-size:9px;
-  line-height:1.8;
-  color:#91809f
-}
-.credit a{
-  color:#b9a8c5
 }
 .toast{
   position:absolute;
@@ -633,10 +616,6 @@ body:not([data-input-mode="controller"]) [data-input-guide="controller"]{
   color:#93819f;
   line-height:1.6
 }
-.help-done{
-  min-height:48px;
-  font-size:13px
-}
 @media(min-width:850px) and (min-height:601px){
   .brand strong{
     font-size:14px
@@ -647,25 +626,10 @@ body:not([data-input-mode="controller"]) [data-input-guide="controller"]{
   .topbar{
     padding-left:22px
   }
-  .welcome-card{
-    max-width:400px
-  }
-  .welcome h1{
-    font-size:46px
-  }
 }
 @media(max-width:380px){
   .brand>span{
     display:none
-  }
-  .welcome-card{
-    padding:12px
-  }
-  .welcome h1{
-    margin:12px 0
-  }
-  .welcome-card>p{
-    margin-bottom:14px
   }
 }
 @media(orientation:landscape) and (max-height:600px){
@@ -703,31 +667,6 @@ body:not([data-input-mode="controller"]) [data-input-guide="controller"]{
   }
   .controls-hidden .play-area{
     grid-template-columns:minmax(0,1fr)
-  }
-  .welcome{
-    padding:8px
-  }
-  .welcome-card{
-    padding:6px;
-    max-width:330px
-  }
-  .welcome h1{
-    font-size:29px;
-    margin:10px 0
-  }
-  .welcome-card>p{
-    font-size:11px;
-    margin-bottom:12px;
-    line-height:1.4
-  }
-  .welcome-card>.welcome-note{
-    margin:7px 0
-  }
-  .start{
-    min-height:44px
-  }
-  .credit{
-    font-size:8px
   }
 }
 @media(prefers-reduced-motion:reduce){
