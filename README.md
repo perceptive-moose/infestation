@@ -30,12 +30,15 @@ AI Disclaimer: This game uses entirely AI-generated artwork, music and sound eff
 - Drag the settings sliders, scroll the settings panel on smaller screens,
   and choose which side holds the D-pad. The control-side preference is saved
   alongside the existing audio and screen-shake preferences.
+- Set **On-screen controls: shown / hidden** in the game menu to show or hide
+  the pad. Your choice is saved; before you choose, phones show the pad and
+  desktops hide it by default.
 - In portrait gameplay, the touch dock replaces the duplicate instruction
   panel, giving its space back to the puzzle. Room tips appear in a scrollable,
   dismissible overlay; opening, closing or typing a tip does not resize or
   reposition the board.
 - Direct taps on the game's menus and map, audio activation on a real gesture,
-  a controls toggle, and fullscreen where the browser supports it. Keyboard
+  and fullscreen where the browser supports it. Keyboard
   and controller controls remain available, and native builds retain their original HUD.
 - Undoable restarts: undo past the moves in a fresh attempt to restore the
   previous one, then keep undoing through earlier moves and restarts.

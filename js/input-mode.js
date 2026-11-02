@@ -26,6 +26,7 @@
     function create({ touchDefault = false, onChange = function () {} } = {}) {
         let mode = touchDefault ? "touch" : "keyboard";
         let visible = touchDefault;
+        let controlsPreference = null;
         let previousPads = new Map();
 
         function controlsVisible() {
@@ -40,7 +41,7 @@
             if (mode === next) return;
             mode = next;
             // Prompts can change without moving or resizing the puzzle. Only
-            // the explicit dock toggle changes visibility after startup.
+            // the visibility setting changes the layout after startup.
             notify();
         }
 
@@ -84,9 +85,15 @@
             }
         }
 
-        function toggleControls() {
-            visible = !visible;
-            // Explicitly opening the pad opts into its matching instructions.
+        function setControlsPreference(preference) {
+            preference = preference == null ? null : Boolean(preference);
+            // The engine publishes saved settings every frame. Applying the
+            // same preference must not override a newer keyboard/pad gesture.
+            if (preference === controlsPreference) return;
+            controlsPreference = preference;
+            visible = preference ?? touchDefault;
+            // Choosing to show the pad opts into its matching instructions,
+            // even if the device default had already made it visible.
             if (visible) mode = "touch";
             notify();
         }
@@ -95,7 +102,7 @@
             pointer,
             keyboard,
             gamepads,
-            toggleControls,
+            setControlsPreference,
             mode: () => mode,
             code: () => MODE[mode],
             controlsVisible
