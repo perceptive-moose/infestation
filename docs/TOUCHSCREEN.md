@@ -229,7 +229,8 @@ Also start from a fresh page using only the keyboard or controller. Hold a
 direction while opening Help, release it inside Help, then return to the game;
 the hero should stay still until a fresh input. In a two-hero room with a
 controller connected, keep a physical arrow held while touching the board and
-check that the keyboard continues controlling the same hero.
+check that the keyboard continues controlling the same hero. Native menu
+Restart should clear a queued synchronized move even before the first turn.
 
 The game still needs WebAssembly and a working WebGL context. Browsers without
 usable hardware graphics support may be unable to start it; reload after a
