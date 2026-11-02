@@ -53,6 +53,7 @@ function setup({ ready = true } = {}) {
     const root = new Target();
     const events = [];
     const actions = [];
+    const interruptions = [];
     const buttons = [];
     document.visibilityState = "visible";
     document.elementFromPoint = () => document.pointed;
@@ -72,7 +73,8 @@ function setup({ ready = true } = {}) {
         dispatchEvent(event) { events.push({ ...event, time: clock.now }); }
     };
     vm.runInNewContext(source, { window });
-    const api = window.InfestationTouch.create({ canvas, root, onAction: action => actions.push(action) });
+    const api = window.InfestationTouch.create({ canvas, root,
+        onAction: action => actions.push(action), onInterrupt: () => interruptions.push(clock.now) });
 
     function button(dataset) {
         const attributes = new Map();
@@ -110,7 +112,7 @@ function setup({ ready = true } = {}) {
         window.emit("pointermove", { pointerId, clientX: 10, clientY: 10 });
     }
     function keys() { return events.map(event => `${event.type}:${event.code}`); }
-    return { clock, window, document, root, canvas, events, actions, api, button, down, up, move, keys };
+    return { clock, window, document, root, canvas, events, actions, interruptions, api, button, down, up, move, keys };
 }
 
 test("quick touch remains down for 80 ms and releases without native mouse events", () => {
@@ -206,6 +208,49 @@ test("switching player preserves an already queued sync move and maps the next p
     assert.ok(s.keys().includes("keydown:ShiftLeft"));
     assert.ok(s.keys().includes("keydown:KeyA"));
     assert.equal(s.events.filter(event => event.type === "keyup").length, 4);
+});
+
+test("switching hero stops a held direction without interrupting a queued synchronized move", () => {
+    const s = setup();
+    const left = s.button({ direction: "left" });
+    s.api.setSync(true);
+    s.down(left, 1);
+    s.clock.advance(100);
+    s.api.setPlayer("p2");
+    assert.deepEqual(s.keys(), ["keydown:ShiftRight", "keydown:ArrowLeft", "keyup:ArrowLeft", "keyup:ShiftRight"]);
+    s.down(left, 2);
+    s.up(2);
+    s.clock.advance(100);
+    assert.ok(s.keys().includes("keydown:KeyA"));
+    assert.deepEqual(s.interruptions, []);
+});
+
+test("a very fast hero switch still delivers the first synchronized tap for its minimum duration", () => {
+    const s = setup();
+    const up = s.button({ direction: "up" });
+    s.api.setSync(true);
+    s.down(up, 1);
+    s.clock.advance(5);
+    s.api.setPlayer("p2");
+    s.down(up, 2);
+    s.up(2);
+    assert.equal(s.keys().includes("keyup:ArrowUp"), false);
+    s.clock.advance(100);
+    for (const code of ["ArrowUp", "KeyW"]) {
+        const events = s.events.filter(event => event.code === code);
+        assert.deepEqual(events.map(event => event.type), ["keydown", "keyup"]);
+        assert.ok(events[1].time - events[0].time >= 80);
+    }
+    assert.deepEqual(s.interruptions, []);
+});
+
+test("unexpected pointer cancellation notifies the engine bridge, deliberate release does not", () => {
+    const s = setup();
+    s.down(s.button({ direction: "up" }));
+    s.window.emit("pointercancel", { pointerId: 1 });
+    assert.deepEqual(s.interruptions, [0]);
+    s.api.releaseAll();
+    assert.deepEqual(s.interruptions, [0]);
 });
 
 test("sliding the D-pad gives distinct cardinal moves without overlapping directions", () => {
@@ -326,8 +371,21 @@ test("disabled buttons and UI toggles are untouched; destroy removes event handl
     assert.deepEqual(s.keys(), ["keydown:Space", "keyup:Space"]);
 });
 
-for (const code of ["KeyU", "KeyR", "Escape", "Enter"]) {
-    test(`${code} discards buffered moves before the meta action`, () => {
+test("Wait releases a held direction before its keydown and discards queued movement", () => {
+    const s = setup();
+    s.down(s.button({ direction: "right" }), 1);
+    s.clock.advance(100);
+    s.down(s.button({ direction: "up" }), 2);
+    s.down(s.button({ code: "Space" }), 3);
+    assert.deepEqual(s.keys(), ["keydown:ArrowRight", "keyup:ArrowRight", "keydown:Space"]);
+    s.up(3);
+    s.clock.advance(1000);
+    assert.deepEqual(s.keys(), ["keydown:ArrowRight", "keyup:ArrowRight", "keydown:Space", "keyup:Space"]);
+    assert.deepEqual(s.interruptions, []);
+});
+
+for (const code of ["Space", "KeyU", "KeyR", "Escape", "Enter"]) {
+    test(`${code} discards buffered moves before the priority action`, () => {
         const s = setup();
         const right = s.button({ direction: "right" });
         s.api.setSync(true);
