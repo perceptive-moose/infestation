@@ -6,7 +6,8 @@ serve it from source using the [README instructions](../README.md).
 
 ## Playing
 
-Tap **Tap to play** after loading, then **Play** to begin. The initial tap also
+Choose **Play** after loading, then **Play** on the title screen to begin.
+The initial gesture also
 allows the browser to start audio. The game is turn based, so there is no need
 to rush between moves.
 

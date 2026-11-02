@@ -156,10 +156,10 @@
   });
   canvas.addEventListener("webglcontextcreationerror", event => {
     console.warn("WebGL initialization failed:", event.statusMessage);
-    showLoadFailure("WebGL isn’t available in this browser. Open the demo in a browser with hardware graphics enabled.");
+    showLoadFailure("WebGL isn’t available in this browser. Open the game in a browser with hardware graphics enabled.");
   });
   window.addEventListener("error", event => {
-    console.error("Touch demo error:", event.message);
+    console.error("Infestation error:", event.message);
     if (!ready) showLoadFailure("The game couldn’t initialize. Try reloading in Chrome or Safari.");
   });
   // First poll happens once App has loaded sprites/audio and starts running.
@@ -194,7 +194,7 @@
         if (!ready) {
           ready = true;
           start.disabled = false;
-          document.getElementById("start-label").textContent = "Tap to play";
+          document.getElementById("start-label").textContent = "Play";
           document.getElementById("load-note").textContent = "Sound starts with your tap. Then choose Play to begin.";
           syncPresentation();
         }
