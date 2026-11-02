@@ -181,8 +181,9 @@ test("menus preserve room geometry and selection but navigate with unsynced arro
     s.room({ players: 2, screen: SCREEN.menu, actions: ACTION.direction | ACTION.confirm });
     assert.equal(s.api.inputEpoch(), epoch + 1);
     assert.equal(s.elements["controller-meta"].hidden, false);
-    assert.equal(s.elements["context-label"].textContent, "Select");
-    assert.equal(s.elements["context-actions"].hidden, false);
+    assert.equal(s.elements["context-actions"].hidden, true);
+    assert.equal(s.elements["play-actions"].hidden, true);
+    assert.equal(s.elements["context-confirm"].disabled, true);
     assert.equal(s.elements.p2.disabled, true);
     assert.equal(s.controls.player, "p1");
     assert.equal(s.controls.sync, false);
@@ -190,6 +191,7 @@ test("menus preserve room geometry and selection but navigate with unsynced arro
     s.room({ players: 2 });
     assert.equal(s.elements["controller-meta"].hidden, false);
     assert.equal(s.elements["context-actions"].hidden, true);
+    assert.equal(s.elements["play-actions"].hidden, false);
     assert.equal(s.api.selectedPlayer(), 2);
     assert.equal(s.controls.sync, true);
 });
@@ -215,7 +217,7 @@ test("a different room resets hero selection and solo rooms remove the utility r
 });
 
 for (const [screen, label] of [[SCREEN.title, "Play"], [SCREEN.map, "Enter room"],
-    [SCREEN.menu, "Select"], [SCREEN.code, "Close"]]) {
+    [SCREEN.code, "Close"]]) {
     test(`context ${screen} offers ${label} only when confirmation is available`, () => {
         const s = setup();
         s.api.setAvailable(true);
@@ -231,14 +233,28 @@ for (const [screen, label] of [[SCREEN.title, "Play"], [SCREEN.map, "Enter room"
     });
 }
 
-test("leaving a code dialog restores ordinary menu confirmation after its direct Close action", () => {
+test("closing a code dialog hides menu confirmation and the map restores Enter", () => {
     const s = setup();
     s.api.setAvailable(true);
     s.api.update({ room: "", screen: SCREEN.code, players: 0, actions: ACTION.confirm });
     assert.equal(s.elements["context-confirm"].dataset.code, "Escape");
     s.api.update({ room: "", screen: SCREEN.menu, players: 0, actions: ACTION.direction | ACTION.confirm });
-    assert.equal(s.elements["context-label"].textContent, "Select");
+    assert.equal(s.elements["context-actions"].hidden, true);
+    assert.equal(s.elements["context-confirm"].disabled, true);
+    s.api.update({ room: "", screen: SCREEN.map, players: 0, actions: ACTION.direction | ACTION.confirm });
+    assert.equal(s.elements["context-label"].textContent, "Enter room");
     assert.equal(s.elements["context-confirm"].dataset.code, "Enter");
+});
+
+test("settings have no Select or gameplay action buttons even if a confirm flag is supplied", () => {
+    const s = setup();
+    s.api.setAvailable(true);
+    s.api.update({ room: "", screen: SCREEN.menu, players: 0,
+        actions: ACTION.direction | ACTION.confirm });
+    assert.equal(s.elements["context-actions"].hidden, true);
+    assert.equal(s.elements["play-actions"].hidden, true);
+    assert.equal(s.elements["context-confirm"].disabled, true);
+    for (const direction of s.directions) assert.equal(direction.disabled, false);
 });
 
 test("saved D-pad side restores and changing it cancels input before the layout moves", () => {
