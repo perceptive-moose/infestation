@@ -87,7 +87,8 @@ cargo test --locked -p infestation -p scenario_tests --lib
 On Ubuntu, native tests need `libasound2-dev`, `libudev-dev` and `pkg-config`.
 
 The JavaScript tests use Node.js's built-in test runner and require no npm
-packages:
+packages. Run the Rust tests above first; their build step prepares the browser
+runtime used by the shell integration tests:
 
 ```sh
 node --test tests/*.test.cjs
