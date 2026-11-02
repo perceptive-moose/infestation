@@ -14,7 +14,7 @@ to rush between moves.
 | --- | --- |
 | Directional pad | Move the selected hero. Tap for a step or hold to repeat. You can slide between directions. The center is inactive. |
 | Wait | Pass a turn without moving. In two-hero rooms, it supplies a wait for both heroes. |
-| Play / Enter room / Select / Close | Contextual confirmation on the title, map, menu or code screen. During gameplay, Continue is on the win card. |
+| Play / Enter room / Close | Contextual confirmation on the title, map or code screen. During gameplay, Continue is on the win card. Settings and menu items accept direct taps without an extra Select button. |
 | Undo | Take back a move or a restart. |
 | Restart | Tap twice within two seconds to start a fresh, undoable attempt. |
 | Blue / orange portrait | Choose the hero controlled by the directional pad. A matching ring marks that hero on the board. Shown only in two-hero rooms. |
@@ -25,7 +25,9 @@ to rush between moves.
 | Help (?) | Open the touch-control guide. |
 
 The game's own menu buttons and map rooms also accept direct taps. Drag the
-map to explore it. The pad and Select provide another way to navigate menus.
+map to explore it. The pad can highlight menu rows and adjust sliders;
+keyboard and gamepad confirmation remain available. Touch users choose a row
+by tapping it directly.
 Restart, Wait and Undo share the same style in the right-hand column, from top
 to bottom. Unavailable actions become disabled without moving the other buttons.
 Undo stays in its normal position after winning or losing. Wait never becomes

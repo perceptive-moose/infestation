@@ -265,7 +265,7 @@ impl App {
             match overlay {
                 Overlay::Menu(_) => {
                     state.screen = TouchScreen::Menu;
-                    state.actions = touch_ui::DIRECTION | touch_ui::CONFIRM;
+                    state.actions = touch_ui::DIRECTION;
                 }
                 Overlay::Code(_) => {
                     state.screen = TouchScreen::Code;
