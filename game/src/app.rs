@@ -186,9 +186,12 @@ impl App {
         };
         self.input.track_device(&self.gamepad);
         let meta = self.input.poll_meta_inputs(&self.gamepad, dt);
-        let player_actions = self
-            .input
-            .poll_player_actions(&self.gamepad, dt, players, 0.3);
+        let player_actions = self.input.poll_player_actions(
+            &self.gamepad,
+            dt,
+            players,
+            self.settings.touch_repeat_delay_seconds(),
+        );
         let nav = self.input.poll_nav(&self.gamepad, dt);
         let PointerInput {
             events: pointer,

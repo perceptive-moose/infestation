@@ -30,6 +30,9 @@ AI Disclaimer: This game uses entirely AI-generated artwork, music and sound eff
 - Drag the settings sliders, scroll the settings panel on smaller screens,
   and choose which side holds the D-pad. The control-side preference is saved
   alongside the existing audio and screen-shake preferences.
+- Adjust **D-pad delay** to set the pace of held touch movement: 0.10–0.60
+  seconds, with a slower 0.30-second default. Fresh taps stay immediate, and
+  keyboard/controller movement keeps its original timing.
 - Set **On-screen controls: shown / hidden** in the game menu to show or hide
   the pad. Your choice is saved; before you choose, phones show the pad and
   desktops hide it by default.
