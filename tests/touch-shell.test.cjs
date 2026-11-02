@@ -110,8 +110,7 @@ function setup({ touchDefault = false } = {}) {
     document.body = get("body");
     document.body.dataset.wasmPath = "test.wasm";
     document.documentElement = {};
-    get("start-game").disabled = true;
-    get("start-label").textContent = "Loading game…";
+    get("loading-label").textContent = "Loading game…";
     const canvas = get("glcanvas");
     canvas.parentElement = get("game-container");
     canvas.focus(); // The original loader does this before initialization.
@@ -147,6 +146,7 @@ function setup({ touchDefault = false } = {}) {
     const plugins = [];
     const keyDowns = [];
     const heldKeys = new Set();
+    let audioResumes = 0;
     let controls;
     const context = {
         console: { warn() {}, error() {} }, document, window,
@@ -160,6 +160,7 @@ function setup({ touchDefault = false } = {}) {
             key_down: (...args) => { keyDowns.push(args); heldKeys.add(args[0]); },
             key_up: code => heldKeys.delete(code), key_press() {}
         },
+        audio_context: { state: "suspended", resume() { audioResumes += 1; return Promise.resolve(); } },
         canvas
     };
     vm.createContext(context);
@@ -191,9 +192,10 @@ function setup({ touchDefault = false } = {}) {
         pads[index] = { connected: true, id: "Xbox", axes,
             buttons: Array.from({ length: 17 }, (_, button) => ({ pressed: buttons.includes(button) })) };
     }
-    function play() { poll(); get("start-game").emit("click"); }
+    function loadGame() { poll(); }
     return { get, document, window, canvas, pads, pad, imports: imports.env, controls,
-        key, poll, play, advance, keyDowns, heldKeys,
+        key, poll, loadGame, advance, keyDowns, heldKeys,
+        get audioResumes() { return audioResumes; },
         get epoch() { return imports.env.infestation_touch_input_epoch(); } };
 }
 
@@ -203,66 +205,69 @@ test("loading blocks game input and permits Tab to leave the canvas", () => {
     assert.equal(s.key("Tab").defaultPrevented, false);
     assert.equal(s.key("Enter").defaultPrevented, true);
     assert.deepEqual(s.keyDowns, []);
-    assert.equal(s.get("welcome").hidden, false);
+    assert.equal(s.get("loading").hidden, false);
 });
 
-test("readiness focuses Play without requiring a click and leaves Tab usable", () => {
-    const s = setup();
-    assert.equal(s.poll().blocked, true);
-    assert.equal(s.get("start-game").disabled, false);
-    assert.equal(s.document.activeElement.id, "start-game");
-    assert.equal(s.key("Tab").defaultPrevented, false);
-    assert.deepEqual(s.keyDowns, []);
-});
-
-for (const code of ["Enter", "Space"]) {
-    test(`${code} starts once and cannot carry its keydown, repeats or release into the game`, () => {
-        const s = setup();
-        s.poll();
-        const epoch = s.epoch;
-        assert.equal(s.key(code).defaultPrevented, true);
-        assert.equal(s.get("welcome").hidden, true);
+for (const touchDefault of [false, true]) {
+    test(`readiness automatically reveals and focuses the game (${touchDefault})`, () => {
+        const s = setup({ touchDefault });
+        assert.equal(s.poll().blocked, true); // Readiness itself consumes this frame.
+        assert.equal(s.get("loading").hidden, true);
         assert.equal(s.imports.infestation_input_blocked(), 0);
         assert.equal(s.document.activeElement.id, "glcanvas");
-        assert.ok(s.epoch > epoch);
-        assert.equal(s.key(code, "keydown", { repeat: true }).defaultPrevented, true);
-        assert.equal(s.key(code, "keyup").defaultPrevented, true);
-        assert.deepEqual(s.keyDowns, []);
-        s.key(code);
-        assert.equal(s.keyDowns.length, 1);
+        assert.equal(s.get("menu").disabled, false);
+        assert.equal(s.imports.infestation_touch_controls_visible(), Number(touchDefault));
+        assert.equal(s.poll().blocked, false);
     });
 }
 
-test("a key held before readiness cannot activate Play through browser repeats", () => {
+for (const [code, keyCode] of [["Enter", 257], ["Space", 32], ["ArrowRight", 262]]) {
+    test(`the first physical ${code} reaches the game directly and enables audio`, () => {
+        const s = setup();
+        s.loadGame();
+        assert.equal(s.audioResumes, 0);
+        assert.equal(s.key(code).stopped, false);
+        assert.equal(s.keyDowns.length, 1);
+        assert.equal(s.keyDowns[0][0], keyCode);
+        assert.equal(s.heldKeys.has(keyCode), true);
+        assert.equal(s.audioResumes, 1);
+        s.key(code, "keyup");
+        assert.equal(s.heldKeys.size, 0);
+    });
+}
+
+test("a key held during loading cannot carry repeats into the ready game", () => {
     const s = setup();
     s.key("Space");
-    s.poll();
+    s.loadGame();
+    assert.equal(s.get("loading").hidden, true);
     assert.equal(s.key("Space", "keydown", { repeat: true }).defaultPrevented, true);
-    assert.equal(s.get("welcome").hidden, false);
+    assert.deepEqual(s.keyDowns, []);
     s.key("Space", "keyup");
     s.key("Space");
-    assert.equal(s.get("welcome").hidden, true);
+    assert.equal(s.keyDowns.length, 1);
+    assert.equal(s.keyDowns[0][0], 32);
 });
 
-test("welcome activation leaves other focused HTML controls alone", () => {
+test("keys on other focused HTML controls retain their normal behavior", () => {
     const s = setup();
-    s.poll();
+    s.loadGame();
     s.get("original-source-link").focus();
     assert.equal(s.key("Enter").defaultPrevented, false);
-    assert.equal(s.get("welcome").hidden, false);
+    assert.deepEqual(s.keyDowns, []);
+    assert.equal(s.audioResumes, 0);
 });
 
 for (const button of [0, 1, 9]) {
-    test(`controller button ${button} starts on a consumed frame and does not repeat page activation`, () => {
+    test(`controller button ${button} closes Help only on a fresh, consumed press`, () => {
         const s = setup();
-        s.poll();
         s.pad([button]);
         assert.equal(s.poll().blocked, true);
-        assert.equal(s.get("welcome").hidden, true);
-        assert.equal(s.imports.infestation_input_blocked(), 0);
+        assert.equal(s.get("loading").hidden, true);
+        assert.equal(s.poll().blocked, false);
         s.get("show-help").emit("click");
         assert.equal(s.poll().blocked, true);
-        assert.equal(s.get("help").open, true); // Still holding the startup button.
+        assert.equal(s.get("help").open, true); // The controller button remains held.
         s.pad([]);
         s.poll();
         s.pad([button]);
@@ -272,10 +277,44 @@ for (const button of [0, 1, 9]) {
     });
 }
 
+test("first readiness preserves Help focus and does not treat an already-held pad button as closing it", () => {
+    const s = setup();
+    s.get("show-help").emit("click");
+    s.pad([0]);
+    assert.equal(s.poll().blocked, true);
+    assert.equal(s.get("loading").hidden, true);
+    assert.equal(s.get("help").open, true);
+    assert.equal(s.document.activeElement.id, "close-help");
+    assert.equal(s.poll().blocked, true);
+    assert.equal(s.get("help").open, true);
+    s.pad([]);
+    s.poll();
+    s.pad([0]);
+    assert.equal(s.poll().blocked, true);
+    assert.equal(s.get("help").open, false);
+    assert.equal(s.document.activeElement.id, "glcanvas");
+});
+
+test("readiness in a hidden tab defers initial focus until the page becomes visible", () => {
+    const s = setup();
+    s.document.visibilityState = "hidden";
+    s.get("other-control").focus();
+    assert.equal(s.poll().blocked, true);
+    assert.equal(s.get("loading").hidden, true);
+    assert.equal(s.document.activeElement.id, "other-control");
+    s.document.visibilityState = "visible";
+    s.document.emit("visibilitychange");
+    assert.equal(s.imports.infestation_input_blocked(), 0);
+    assert.equal(s.document.activeElement.id, "glcanvas");
+    s.get("other-control").focus();
+    s.document.emit("visibilitychange");
+    assert.equal(s.document.activeElement.id, "other-control"); // Initial focus runs only once.
+});
+
 for (const touchDefault of [false, true]) {
     test(`Help gates gameplay and interrupts independently of dock visibility (${touchDefault})`, () => {
         const s = setup({ touchDefault });
-        s.play();
+        s.loadGame();
         const before = s.epoch;
         s.get("show-help").emit("click");
         assert.ok(s.epoch > before);
@@ -293,7 +332,7 @@ for (const touchDefault of [false, true]) {
 
 test("opening Help clears a held canvas key and consumes the release delivered to the dialog", () => {
     const s = setup();
-    s.play();
+    s.loadGame();
     s.key("ArrowRight");
     assert.equal(s.heldKeys.has(262), true);
     s.get("show-help").emit("click");
@@ -308,7 +347,7 @@ test("opening Help clears a held canvas key and consumes the release delivered t
 for (const code of ["Escape", "Enter", "Space"]) {
     test(`${code} closes Help without activating gameplay after focus returns`, () => {
         const s = setup();
-        s.play();
+        s.loadGame();
         s.get("show-help").emit("click");
         assert.equal(s.key(code).defaultPrevented, true);
         assert.equal(s.get("help").open, false);
@@ -318,21 +357,20 @@ for (const code of ["Escape", "Enter", "Space"]) {
     });
 }
 
-test("native dialog cancellation restores Play focus when Help was opened before starting", () => {
+test("native dialog cancellation restores the ready game's focus", () => {
     const s = setup();
-    s.poll();
+    s.loadGame();
     s.get("show-help").emit("click");
     const event = s.get("help").emit("cancel");
     assert.equal(event.defaultPrevented, true);
     assert.equal(s.get("help").open, false);
-    assert.equal(s.get("welcome").hidden, false);
-    assert.equal(s.document.activeElement.id, "start-game");
-    assert.equal(s.imports.infestation_input_blocked(), 1);
+    assert.equal(s.document.activeElement.id, "glcanvas");
+    assert.equal(s.imports.infestation_input_blocked(), 0);
 });
 
 test("moving focus from the canvas releases only keys the game actually received", () => {
     const s = setup();
-    s.play();
+    s.loadGame();
     s.key("ArrowRight");
     s.get("tip").focus();
     assert.equal(s.heldKeys.size, 0);
@@ -346,7 +384,7 @@ test("moving focus from the canvas releases only keys the game actually received
 
 test("backgrounding blocks input, clears held keys, and interrupts even with the dock hidden", () => {
     const s = setup();
-    s.play();
+    s.loadGame();
     s.key("ArrowRight");
     const before = s.epoch;
     s.document.visibilityState = "hidden";
@@ -360,17 +398,14 @@ test("backgrounding blocks input, clears held keys, and interrupts even with the
     assert.equal(s.key("ArrowRight", "keydown", { repeat: true }).defaultPrevented, true);
 });
 
-test("a load finishing after the warning recovers all page controls", () => {
+test("a load finishing after the warning automatically enables the game and controls", () => {
     const s = setup({ touchDefault: true });
     s.advance(45000);
     assert.match(s.get("load-note").textContent, /keep waiting/);
-    assert.equal(s.get("start-game").disabled, true);
-    assert.equal(s.get("start-label").textContent, "Loading game…");
+    assert.equal(s.get("loading").hidden, false);
+    assert.equal(s.get("loading-label").textContent, "Loading game…");
     s.poll();
-    assert.equal(s.get("start-game").disabled, false);
-    assert.equal(s.get("start-label").textContent, "Play");
-    assert.doesNotMatch(s.get("load-note").textContent, /keep waiting/);
-    s.get("start-game").emit("click");
+    assert.equal(s.get("loading").hidden, true);
     assert.equal(s.imports.infestation_input_blocked(), 0);
     assert.equal(s.get("menu").disabled, false);
     assert.equal(s.imports.infestation_touch_controls_visible(), 1);
@@ -382,16 +417,32 @@ test("a fatal graphics error cannot be cleared by readiness or the slow-load tim
     s.advance(45000);
     s.pad([0]);
     s.poll();
-    assert.equal(s.get("start-game").disabled, true);
-    assert.equal(s.get("start-label").textContent, "Game couldn’t start");
+    assert.equal(s.get("loading-label").textContent, "Game couldn’t start");
     assert.match(s.get("load-note").textContent, /WebGL/);
-    assert.equal(s.get("welcome").hidden, false);
+    assert.equal(s.get("loading").hidden, false);
     assert.equal(s.imports.infestation_input_blocked(), 1);
+});
+
+test("losing graphics after startup reopens a persistent error overlay and blocks input", () => {
+    const s = setup({ touchDefault: true });
+    s.loadGame();
+    s.canvas.emit("webglcontextlost");
+    assert.equal(s.get("loading").hidden, false);
+    assert.equal(s.get("loading-label").textContent, "Game interrupted");
+    assert.match(s.get("load-note").textContent, /Reload/);
+    assert.equal(s.imports.infestation_input_blocked(), 1);
+    assert.equal(s.get("menu").disabled, true);
+    assert.equal(s.imports.infestation_touch_controls_visible(), 0);
+    s.key("ArrowRight");
+    s.advance(45000);
+    s.poll();
+    assert.deepEqual(s.keyDowns, []);
+    assert.equal(s.get("loading").hidden, false);
 });
 
 test("touch inputs use the separate engine channel without synthesizing keyboard state", () => {
     const s = setup({ touchDefault: true });
-    s.play();
+    s.loadGame();
     s.controls.tap("ArrowRight");
     const first = s.imports.infestation_touch_input();
     assert.equal(first & 0xffff, 1 << 3);

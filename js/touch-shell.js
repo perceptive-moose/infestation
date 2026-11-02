@@ -3,8 +3,7 @@
   "use strict";
   const canvas = document.getElementById("glcanvas");
   const app = document.getElementById("app");
-  const welcome = document.getElementById("welcome");
-  const start = document.getElementById("start-game");
+  const loading = document.getElementById("loading");
   const help = document.getElementById("help");
   const toast = document.getElementById("toast");
   const menuButton = document.querySelector('.topbar [data-code="Escape"]');
@@ -29,11 +28,12 @@
   let toastTimer;
   let ready = false;
   let loadFailed = false;
+  let initialFocusPending = true;
   let engineTipVisible = false;
   let wasInputBlocked = true;
   const heldGameKeys = new Set();
   const consumedKeys = new Set();
-  let previousPageButtons = new Map();
+  let previousHelpButtons = new Map();
 
   function showToast(message, duration = 2600) {
     clearTimeout(toastTimer);
@@ -87,11 +87,10 @@
   // Reading or scrolling a tip must not leave a held direction running.
   tipRoot.addEventListener("pointerdown", () => dock.interrupt());
   function syncTipVisibility() {
-    tips.setSuppressed(!engineTipVisible || help.open || !welcome.hidden
-      || !controlsVisible || !ready || loadFailed);
+    tips.setSuppressed(!engineTipVisible || inputBlocked() || !controlsVisible);
   }
   function inputBlocked() {
-    return !ready || loadFailed || help.open || !welcome.hidden
+    return !ready || loadFailed || help.open
       || document.visibilityState === "hidden";
   }
   function releasePhysicalKeys() {
@@ -105,6 +104,7 @@
     heldGameKeys.clear();
   }
   function syncPresentation() {
+    loading.hidden = ready && !loadFailed;
     const blocked = inputBlocked();
     if (blocked !== wasInputBlocked) {
       wasInputBlocked = blocked;
@@ -127,12 +127,6 @@
       ? "Game board. Use the direction buttons to move, Wait to pass a turn, and Undo to take back a move."
       : mode === "controller" ? "Game board. Use your controller. Matching button prompts appear in the game."
         : "Game board. Use the arrow keys or WASD to move, Space to wait, and U to undo.");
-    if (ready && !loadFailed) {
-      document.getElementById("start-label").textContent = "Play";
-      document.getElementById("load-note").textContent = mode === "touch"
-        ? "Sound starts when you tap Play."
-        : "Sound starts when you choose Play.";
-    }
   }
   // Real input chooses instructions; dock input has its own engine channel.
   document.addEventListener("pointerdown", event => {
@@ -141,15 +135,10 @@
   }, { capture: true, passive: true });
   function focusGame() { canvas.focus({ preventScroll: true }); }
   function restoreFocus() {
-    if (!welcome.hidden && ready && !loadFailed) start.focus({ preventScroll: true });
-    else if (!inputBlocked()) focusGame();
-  }
-  function beginGame() {
-    if (!ready || loadFailed || help.open || welcome.hidden) return;
-    resumeAudio();
-    welcome.hidden = true;
-    syncPresentation();
-    focusGame();
+    if (!inputBlocked()) {
+      focusGame();
+      initialFocusPending = false;
+    }
   }
   function closeHelp() { help.close(); syncPresentation(); restoreFocus(); }
   function consumeKey(event) {
@@ -173,13 +162,6 @@
       }
       return;
     }
-    if (!welcome.hidden && ready && !loadFailed && confirm && !event.repeat
-      && (event.target === canvas || event.target === start || event.target === document.body)) {
-      consumedKeys.add(event.code);
-      consumeKey(event);
-      beginGame();
-      return;
-    }
     if (inputBlocked()) {
       if (event.target === canvas) {
         // Let Tab leave the canvas while loading; its own handler traps Tab.
@@ -191,7 +173,10 @@
       }
       return;
     }
-    if (event.target === canvas) heldGameKeys.add(event.code);
+    if (event.target === canvas) {
+      resumeAudio();
+      heldGameKeys.add(event.code);
+    }
   }, { capture: true });
   document.addEventListener("keyup", event => {
     if (!event.isTrusted) return;
@@ -205,23 +190,21 @@
   }, { capture: true });
   canvas.addEventListener("blur", releasePhysicalKeys);
   window.addEventListener("blur", releasePhysicalKeys);
-  start.addEventListener("click", beginGame);
-  function pollPageButtons(pads) {
+  function pollHelpButtons(pads) {
     const next = new Map();
     let confirmed = false;
     for (let index = 0; index < Math.min(pads.length, 2); index += 1) {
       if (!pads[index]?.connected) continue;
       const buttons = [0, 1, 9].map(button => Boolean(pads[index].buttons?.[button]?.pressed));
-      const previous = previousPageButtons.get(index);
+      const previous = previousHelpButtons.get(index);
       if (buttons.some((pressed, button) => pressed && !previous?.[button])) confirmed = true;
       next.set(index, buttons);
     }
-    previousPageButtons = next;
+    previousHelpButtons = next;
     if (!confirmed || !ready || loadFailed || document.visibilityState === "hidden") return;
     // The engine samples the blocking flag before and after this gamepad poll,
     // consuming the activation frame and suppressing the hold until release.
     if (help.open) closeHelp();
-    else if (!welcome.hidden) beginGame();
   }
   document.getElementById("show-help").addEventListener("click", () => {
     help.showModal();
@@ -231,7 +214,10 @@
   document.getElementById("help-done").addEventListener("click", closeHelp);
   help.addEventListener("cancel", event => { event.preventDefault(); closeHelp(); });
   help.addEventListener("close", () => { syncPresentation(); restoreFocus(); });
-  document.addEventListener("visibilitychange", syncPresentation);
+  document.addEventListener("visibilitychange", () => {
+    syncPresentation();
+    if (initialFocusPending) restoreFocus();
+  });
   const fullscreen = document.getElementById("fullscreen");
   if (!document.documentElement.requestFullscreen) fullscreen.hidden = true;
   fullscreen.addEventListener("click", async () => {
@@ -271,11 +257,10 @@
     loadFailed = true;
     engineTipVisible = false;
     tips.clear();
-    syncPresentation();
-    if (welcome.hidden) { showToast(message, 12000); return; }
-    document.getElementById("start-label").textContent = "Game couldn’t start";
+    document.getElementById("loading-label").textContent = ready
+      ? "Game interrupted" : "Game couldn’t start";
     document.getElementById("load-note").textContent = message;
-    start.disabled = true;
+    syncPresentation();
   }
   canvas.addEventListener("webglcontextlost", () => {
     dock.interrupt();
@@ -324,17 +309,18 @@
       };
       const count = importObject.env.sapp_gamepad_count;
       importObject.env.sapp_gamepad_count = function () {
+        const connected = count();
         const pads = navigator.getGamepads?.() || [];
         inputMode.gamepads(pads);
+        // Record buttons held during loading without letting them close Help.
+        pollHelpButtons(pads);
         if (!ready) {
           ready = true;
-          start.disabled = loadFailed;
           syncInputPresentation();
           syncPresentation();
-          if (!help.open && document.visibilityState !== "hidden") restoreFocus();
+          restoreFocus();
         }
-        pollPageButtons(pads);
-        return count();
+        return connected;
       };
     }
   });

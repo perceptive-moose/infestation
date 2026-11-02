@@ -6,16 +6,16 @@ serve it from source using the [README instructions](../README.md).
 
 ## Playing
 
-Choose **Play** after loading, then begin on the title screen. The opening
-screen accepts a tap/click, Enter or Space, or controller confirmation. Its
-activation is consumed so it cannot also move the game underneath. A keyboard
-or pointer gesture allows the browser to start audio. The game is turn based,
-so there is no need to rush between moves.
+The game opens automatically when loading finishes. Begin on the game's title
+screen with a tap, key press or controller confirmation. A keyboard or pointer
+gesture allows the browser to start audio. The game is turn based, so there is
+no need to rush between moves.
 
 Help blocks gameplay from every input device. Closing it suppresses controls
 that were already held, so they cannot cause an unintended move. If loading
 takes longer than expected, the page shows a warning and remains ready to
-recover when loading finishes.
+recover when loading finishes. A graphics failure leaves a visible error
+message with recovery instructions, including if it happens after play begins.
 
 | Control | Action |
 | --- | --- |
@@ -134,8 +134,8 @@ position or scale at a fixed viewport and controls state.
 
 A tip retains its dismissal and scroll position while temporarily suppressed,
 such as behind a menu. A different room, text or speaker starts a new tip.
-Tips are suppressed during transitions, outcome cards, the welcome screen and
-help. Touching or scrolling a tip releases held movement.
+Tips are suppressed during transitions, outcome cards, loading, errors and
+Help. Touching or scrolling a tip releases held movement.
 
 Hiding the touch controls restores the game's own portrait panel. Rotating the
 device or toggling the dock can therefore change the board layout. In the
@@ -149,7 +149,7 @@ builds keep the original HUD and tutorial presentation.
 
 | File | Responsibility |
 | --- | --- |
-| `index.html` | Web page, control buttons, welcome/help UI and room-tip markup. |
+| `index.html` | Web page, control buttons, loading/error status, Help and room-tip markup. |
 | `touch.css` | Compact responsive dock, safe areas and independent tip overlay. |
 | `js/touch-controls.js` | Pointer input, hero selection, Sync modifiers and independently polled touch actions. |
 | `js/touch-shell.js` | Loading, audio activation, visibility, fullscreen, Help, keyboard focus and the JavaScript side of the game bridge. |
@@ -169,7 +169,7 @@ builds keep the original HUD and tutorial presentation.
 | `tests/touch-tips.test.cjs` | Tip content, visibility, identity and scroll regression tests. |
 | `tests/touch-state.test.cjs` | Hero-row gating, contextual actions, outcome states and cancellation regression tests. |
 | `tests/input-mode.test.cjs` | Initial device choice, real input transitions, synthetic input and controller activity regression tests. |
-| `tests/touch-shell.test.cjs` | Startup confirmation, modal input isolation, focus/key-release handling and slow-load recovery using the actual browser modules. |
+| `tests/touch-shell.test.cjs` | Automatic startup, modal input isolation, focus/key-release handling and slow-load recovery using the actual browser modules. |
 
 Structured tutorial notes support an optional `touch` field alongside their
 keyboard/controller variants. All shipped device-specific notes have authored
@@ -225,8 +225,9 @@ mouse, and a controller; verify both the displayed prompts and hero routing.
 Check the native version with `cargo run -r` when changing the
 shared Rust HUD code.
 
-Also start from a fresh page using only the keyboard or controller. Hold a
-direction while opening Help, release it inside Help, then return to the game;
+Also open a fresh page and check that loading goes directly to the game. Use
+the keyboard or controller to begin from the title screen. Hold a direction
+while opening Help, release it inside Help, then return to the game;
 the hero should stay still until a fresh input. In a two-hero room with a
 controller connected, keep a physical arrow held while touching the board and
 check that the keyboard continues controlling the same hero. Native menu
