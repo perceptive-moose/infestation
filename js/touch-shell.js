@@ -8,7 +8,6 @@
   const help = document.getElementById("help");
   const toast = document.getElementById("toast");
   const menuButton = document.querySelector('.topbar [data-code="Escape"]');
-  const controlsToggle = document.getElementById("toggle-controls");
   const tipRoot = document.getElementById("level-tip");
   const inputMode = InfestationInputMode.create({
     touchDefault: InfestationInputMode.prefersTouch({
@@ -100,8 +99,6 @@
     presentedMode = mode;
     document.body.dataset.inputMode = mode;
     app.classList.toggle("controls-hidden", !controlsVisible);
-    controlsToggle.setAttribute("aria-expanded", String(controlsVisible));
-    controlsToggle.setAttribute("aria-label", controlsVisible ? "Hide touch controls" : "Show touch controls");
     canvas.setAttribute("aria-label", mode === "touch"
       ? "Game board. Use the direction buttons to move, Wait to pass a turn, and Undo to take back a move."
       : mode === "controller" ? "Game board. Use your controller. Matching button prompts appear in the game."
@@ -115,9 +112,6 @@
   }
   // Capture identifies the real input before the dock emits synthetic keys.
   document.addEventListener("pointerdown", event => {
-    // Toggling the dock must act on the visibility the button was displaying,
-    // without an automatic device change reversing that action first.
-    if (event.target.closest?.("#toggle-controls")) return;
     if (event.pointerType === "mouse" && event.target.closest?.(".topbar")) return;
     inputMode.pointer(event, Boolean(event.target.closest?.("#controller")));
   }, { capture: true, passive: true });
@@ -139,10 +133,6 @@
   help.addEventListener("cancel", () => { dock.interrupt(); });
   help.addEventListener("close", syncPresentation);
   document.addEventListener("visibilitychange", syncPresentation);
-  controlsToggle.addEventListener("click", () => {
-    inputMode.toggleControls();
-    focusGame();
-  });
   const fullscreen = document.getElementById("fullscreen");
   if (!document.documentElement.requestFullscreen) fullscreen.hidden = true;
   fullscreen.addEventListener("click", async () => {
@@ -215,6 +205,9 @@
       };
       importObject.env.infestation_touch_layout = dpadRight => {
         dock.setDpadRight(Boolean(dpadRight));
+      };
+      importObject.env.infestation_touch_visibility = preference => {
+        inputMode.setControlsPreference(preference < 0 ? null : Boolean(preference));
       };
       importObject.env.infestation_touch_selected_player = () => dock.selectedPlayer();
       importObject.env.infestation_touch_input_epoch = () => dock.inputEpoch();
