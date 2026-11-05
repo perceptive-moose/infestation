@@ -5,6 +5,7 @@
   const app = document.getElementById("app");
   const loading = document.getElementById("loading");
   const help = document.getElementById("help");
+  const importDialog = document.getElementById("progress-import");
   const toast = document.getElementById("toast");
   const menuButton = document.querySelector('.topbar [data-code="Escape"]');
   const tipRoot = document.getElementById("level-tip");
@@ -90,7 +91,7 @@
     tips.setSuppressed(!engineTipVisible || inputBlocked() || !controlsVisible);
   }
   function inputBlocked() {
-    return !ready || loadFailed || help.open
+    return !ready || loadFailed || help.open || importDialog.open
       || document.visibilityState === "hidden";
   }
   function releasePhysicalKeys() {
@@ -149,10 +150,25 @@
     inputMode.keyboard(event);
     if (!event.isTrusted) return;
     if (consumedKeys.has(event.code)) {
-      if (event.repeat) { consumeKey(event); return; }
+      // Editing repeats belong to the text field; after it closes, those
+      // same held keys must not become game commands.
+      if (event.repeat && !(importDialog.open && event.target.id === "import-code")) {
+        consumeKey(event); return;
+      }
       consumedKeys.delete(event.code);
     }
     const confirm = event.code === "Enter" || event.code === "Space";
+    if (importDialog.open) {
+      consumedKeys.add(event.code);
+      if (event.code === "Escape") {
+        consumeKey(event);
+        importDialog.dispatchEvent(new Event("cancel", { cancelable: true }));
+      } else if (confirm && (event.target.id === "import-submit" || event.target.id === "import-cancel")) {
+        consumeKey(event);
+        event.target.click();
+      }
+      return;
+    }
     if (help.open) {
       if (event.code === "Escape" || (confirm
         && (event.target.id === "close-help" || event.target.id === "help-done"))) {
@@ -214,6 +230,12 @@
   document.getElementById("help-done").addEventListener("click", closeHelp);
   help.addEventListener("cancel", event => { event.preventDefault(); closeHelp(); });
   help.addEventListener("close", () => { syncPresentation(); restoreFocus(); });
+  importDialog.addEventListener("import-open", syncPresentation);
+  importDialog.addEventListener("close", () => {
+    syncPresentation();
+    restoreFocus();
+    if (importDialog.returnValue === "imported") showToast("Progress imported.");
+  });
   document.addEventListener("visibilitychange", () => {
     syncPresentation();
     if (initialFocusPending) restoreFocus();
