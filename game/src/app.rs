@@ -78,7 +78,7 @@ pub struct App {
     scene: Scene,
     overlay: Option<Overlay>,
     transition: Option<Transition>,
-    /// A clipboard import is in progress (async on the web).
+    /// An import is waiting for a code or cancellation.
     import_pending: bool,
     quit: bool,
 }
@@ -239,6 +239,9 @@ impl App {
         if let Some(input) = input {
             self.step(&input, hints, gamepads);
         }
+        // The import dialog blocks game input while Rust validates its code.
+        // Finish after input handling so closing it cannot activate the game.
+        self.poll_import();
         self.draw(&ScreenLayout::current(), hints, gamepads);
         self.gamepad.end_frame();
         !self.quit
@@ -374,17 +377,6 @@ impl App {
             self.on_menu_choice(choice, hints, gamepads);
         }
 
-        if self.import_pending
-            && let Some(imported) = storage::progress::poll_import()
-        {
-            self.progress.import(imported);
-            self.import_pending = false;
-            self.audio.play(Sfx::Unlock);
-            if let Scene::Map(_) = self.scene {
-                self.scene = self.map_scene(None, None);
-            }
-        }
-
         let track = self
             .transition
             .as_ref()
@@ -393,6 +385,28 @@ impl App {
             .track();
         self.audio.set_track(Some(track));
         self.audio.update(dt);
+    }
+
+    fn poll_import(&mut self) {
+        if !self.import_pending {
+            return;
+        }
+        let Some(outcome) = storage::progress::poll_import() else {
+            return;
+        };
+        self.import_pending = false;
+        self.input.reset();
+        match outcome {
+            storage::progress::ImportOutcome::Imported(levels) => {
+                self.progress.import(levels);
+                self.audio.play(Sfx::Unlock);
+                if let Scene::Map(_) = self.scene {
+                    self.scene = self.map_scene(None, None);
+                }
+                storage::progress::finish_import();
+            }
+            storage::progress::ImportOutcome::Cancelled => {}
+        }
     }
 
     fn on_menu_choice(&mut self, choice: MenuChoice, hints: InputHints, gamepads: usize) {

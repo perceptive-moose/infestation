@@ -62,6 +62,7 @@ fn decode_progress(encoded: &str) -> Result<HashSet<String>, String> {
     use flate2::read::ZlibDecoder;
     use std::io::Read;
 
+    let encoded: String = encoded.chars().filter(|c| !c.is_whitespace()).collect();
     let compressed = STANDARD
         .decode(encoded)
         .map_err(|e| format!("invalid base64: {e}"))?;
@@ -154,9 +155,21 @@ mod backend {
     }
 }
 
-/// Clipboard-based progress export/import.
+/// Copyable progress codes and platform-specific import input.
 pub(crate) mod progress {
     use super::*;
+
+    #[derive(serde::Deserialize)]
+    #[serde(tag = "action", rename_all = "snake_case")]
+    enum ImportInput {
+        Submit { code: String },
+        Cancel,
+    }
+
+    pub(crate) enum ImportOutcome {
+        Imported(HashSet<String>),
+        Cancelled,
+    }
 
     pub(crate) fn encode(completed: &HashSet<String>) -> String {
         encode_progress(completed)
@@ -167,55 +180,91 @@ pub(crate) mod progress {
     }
 
     pub(crate) fn copy_to_clipboard(text: &str) {
-        clipboard::write(text);
+        platform::write(text);
     }
 
     pub(crate) fn start_import() {
-        clipboard::start_read();
+        platform::start_import();
     }
 
-    pub(crate) fn poll_import() -> Option<HashSet<String>> {
-        let encoded = clipboard::poll_read()?;
-        match decode(&encoded) {
-            Ok(levels) => Some(levels),
+    pub(crate) fn finish_import() {
+        platform::finish_import();
+    }
+
+    #[must_use]
+    pub(crate) fn poll_import() -> Option<ImportOutcome> {
+        let code = match platform::poll_input()? {
+            ImportInput::Submit { code } => code,
+            ImportInput::Cancel => return Some(ImportOutcome::Cancelled),
+        };
+        match decode(&code) {
+            Ok(levels) => Some(ImportOutcome::Imported(levels)),
             Err(e) => {
                 log::warn!("Failed to decode imported progress: {}", e);
-                None
+                #[cfg(target_arch = "wasm32")]
+                {
+                    platform::show_import_error(&e);
+                    None
+                }
+                #[cfg(not(target_arch = "wasm32"))]
+                Some(ImportOutcome::Cancelled)
             }
         }
     }
 
     #[cfg(target_arch = "wasm32")]
-    mod clipboard {
-        const CLIPBOARD_KEY: &str = "infestation_clipboard_data";
+    mod platform {
+        use super::ImportInput;
+
+        const IMPORT_KEY: &str = "infestation_progress_import";
 
         unsafe extern "C" {
             fn sapp_clipboard_write(buf: *const u8, len: u32);
-            fn sapp_clipboard_read();
+            fn sapp_progress_import();
+            fn sapp_progress_import_error(buf: *const u8, len: u32);
+            fn sapp_progress_import_finish();
         }
 
         pub(super) fn write(text: &str) {
             unsafe { sapp_clipboard_write(text.as_ptr(), text.len() as u32) };
         }
 
-        pub(super) fn start_read() {
-            unsafe { sapp_clipboard_read() };
+        pub(super) fn start_import() {
+            unsafe { sapp_progress_import() };
         }
 
-        pub(super) fn poll_read() -> Option<String> {
-            let storage = quad_storage::STORAGE.lock().unwrap();
-            let text = storage.get(CLIPBOARD_KEY)?;
+        pub(super) fn finish_import() {
+            unsafe { sapp_progress_import_finish() };
+        }
+
+        pub(super) fn show_import_error(error: &str) {
+            unsafe { sapp_progress_import_error(error.as_ptr(), error.len() as u32) };
+        }
+
+        #[must_use]
+        pub(super) fn poll_input() -> Option<ImportInput> {
+            let mut storage = quad_storage::STORAGE.lock().unwrap();
+            let text = storage.get(IMPORT_KEY)?;
+            storage.remove(IMPORT_KEY);
             drop(storage);
-            quad_storage::STORAGE.lock().unwrap().remove(CLIPBOARD_KEY);
-            Some(text)
+            match serde_json::from_str(&text) {
+                Ok(input) => Some(input),
+                Err(error) => {
+                    log::warn!("Failed to read progress import: {}", error);
+                    show_import_error("Invalid import request. Please try again.");
+                    None
+                }
+            }
         }
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    mod clipboard {
+    mod platform {
         use std::sync::Mutex;
 
-        static PENDING: Mutex<Option<String>> = Mutex::new(None);
+        use super::ImportInput;
+
+        static PENDING: Mutex<Option<ImportInput>> = Mutex::new(None);
 
         pub(super) fn write(text: &str) {
             if let Ok(mut cb) = arboard::Clipboard::new() {
@@ -223,17 +272,108 @@ pub(crate) mod progress {
             }
         }
 
-        pub(super) fn start_read() {
-            let result = arboard::Clipboard::new()
-                .and_then(|mut c| c.get_text())
-                .ok()
-                .filter(|s| !s.trim().is_empty())
-                .map(|s| s.trim().to_string());
-            *PENDING.lock().unwrap() = result;
+        pub(super) fn start_import() {
+            let input = match arboard::Clipboard::new().and_then(|mut c| c.get_text()) {
+                Ok(code) if !code.trim().is_empty() => ImportInput::Submit { code },
+                Ok(_) => ImportInput::Cancel,
+                Err(error) => {
+                    log::warn!("Failed to read progress from clipboard: {}", error);
+                    ImportInput::Cancel
+                }
+            };
+            *PENDING.lock().unwrap() = Some(input);
         }
 
-        pub(super) fn poll_read() -> Option<String> {
+        pub(super) fn finish_import() {}
+
+        #[must_use]
+        pub(super) fn poll_input() -> Option<ImportInput> {
             PENDING.lock().unwrap().take()
         }
+
+        #[cfg(test)]
+        mod tests {
+            use super::*;
+            use crate::storage::progress::{ImportOutcome, poll_import};
+
+            #[test]
+            fn native_import_failure_finishes_instead_of_staying_pending() {
+                for input in [
+                    ImportInput::Cancel,
+                    ImportInput::Submit {
+                        code: String::new(),
+                    },
+                    ImportInput::Submit {
+                        code: "not a code!".to_string(),
+                    },
+                ] {
+                    *PENDING.lock().unwrap() = Some(input);
+                    assert!(matches!(poll_import(), Some(ImportOutcome::Cancelled)));
+                    assert!(poll_import().is_none());
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use flate2::Compression;
+    use flate2::write::ZlibEncoder;
+    use std::io::Write;
+
+    fn code_for_json(json: &str) -> String {
+        let mut encoder = ZlibEncoder::new(Vec::new(), Compression::best());
+        encoder.write_all(json.as_bytes()).unwrap();
+        STANDARD.encode(encoder.finish().unwrap())
+    }
+
+    #[test]
+    fn progress_codes_round_trip_with_pasted_whitespace() {
+        let levels = HashSet::from(["rats".to_string(), "webs".to_string()]);
+        let code = encode_progress(&levels);
+        assert_eq!(decode_progress(&code).unwrap(), levels);
+
+        let wrapped = code
+            .as_bytes()
+            .chunks(8)
+            .map(|chunk| std::str::from_utf8(chunk).unwrap())
+            .collect::<Vec<_>>()
+            .join("\r\n ");
+        assert_eq!(decode_progress(&format!(" \t{wrapped}\n")).unwrap(), levels);
+        assert_eq!(
+            decode_progress(&encode_progress(&HashSet::new())).unwrap(),
+            HashSet::new()
+        );
+    }
+
+    #[test]
+    fn invalid_progress_codes_are_rejected_before_changing_saved_progress() {
+        let mut progress = crate::progress::Progress::with_completed(["rats"]);
+        progress.complete("webs");
+        for (code, error) in [
+            ("!not base64!".to_string(), "invalid base64"),
+            (STANDARD.encode(b"not zlib"), "invalid zlib data"),
+            (code_for_json("not JSON"), "invalid JSON"),
+            (code_for_json(r#"{"rats":true}"#), "invalid JSON"),
+        ] {
+            assert!(decode_progress(&code).unwrap_err().starts_with(error));
+            assert_eq!(
+                load_completed_levels(),
+                HashSet::from(["rats".to_string(), "webs".to_string()])
+            );
+        }
+    }
+
+    #[test]
+    fn importing_a_code_preserves_existing_completed_levels() {
+        let mut progress = crate::progress::Progress::with_completed(["rats"]);
+        let imported = HashSet::from(["webs".to_string()]);
+        progress.import(decode_progress(&encode_progress(&imported)).unwrap());
+        assert_eq!(
+            load_completed_levels(),
+            HashSet::from(["rats".to_string(), "webs".to_string()])
+        );
     }
 }
