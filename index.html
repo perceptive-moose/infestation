@@ -68,6 +68,19 @@
       </section>
     </main>
   </div>
+  <dialog id="progress-import" aria-labelledby="import-title" aria-describedby="import-description">
+    <h2 id="import-title">Import progress</h2>
+    <p id="import-description">Paste the code from Export progress. Your completed rooms will be added to the progress saved here.</p>
+    <form id="import-form">
+      <label for="import-code">Export code</label>
+      <textarea id="import-code" rows="4" autofocus spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" aria-describedby="import-error" placeholder="Paste your export code here"></textarea>
+      <p id="import-error" role="alert" hidden></p>
+      <div class="import-actions">
+        <button type="button" id="import-cancel">Cancel</button>
+        <button type="submit" id="import-submit" class="help-done">Import</button>
+      </div>
+    </form>
+  </dialog>
   <dialog id="help" aria-labelledby="help-title">
     <div class="help-heading"><div><div class="eyebrow">FIELD GUIDE</div><h2 id="help-title">How to play</h2></div><button type="button" id="close-help" class="tool" aria-label="Close help">×</button></div>
     <p>Clear each room of rats. Everything moves when you do, so there’s no rush.</p>

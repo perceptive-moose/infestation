@@ -548,6 +548,57 @@ dialog::backdrop{
   background:#07050bd9;
   backdrop-filter:blur(4px)
 }
+#import-title{
+  margin-top:0
+}
+#import-form label{
+  display:block;
+  margin-bottom:8px;
+  font-size:13px;
+  font-weight:700
+}
+#import-code{
+  display:block;
+  width:100%;
+  padding:12px;
+  border:1px solid #745c85;
+  border-radius:10px;
+  background:var(--ink);
+  color:var(--text);
+  font:16px/1.5 monospace;
+  resize:vertical;
+  touch-action:auto;
+  user-select:text;
+  -webkit-user-select:text;
+  -webkit-touch-callout:default
+}
+#import-code:focus-visible{
+  outline:2px solid var(--gold);
+  outline-offset:2px
+}
+#import-error{
+  color:#ffb9ae;
+  font-size:13px;
+  line-height:1.5
+}
+.import-actions{
+  display:flex;
+  gap:12px;
+  margin-top:18px
+}
+.import-actions button{
+  flex:1;
+  min-height:48px;
+  justify-content:center
+}
+#import-cancel{
+  border:1px solid #745c85;
+  border-radius:12px;
+  background:transparent;
+  font-size:13px;
+  font-weight:700;
+  touch-action:manipulation
+}
 .help-heading{
   display:flex;
   justify-content:space-between;
