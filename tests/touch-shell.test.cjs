@@ -19,10 +19,12 @@ class Event {
         this.isTrusted = false;
         this.defaultPrevented = false;
         this.stopped = false;
+        this.propagationStopped = false;
         Object.assign(this, fields);
     }
     preventDefault() { this.defaultPrevented = true; }
-    stopImmediatePropagation() { this.stopped = true; }
+    stopPropagation() { this.propagationStopped = true; }
+    stopImmediatePropagation() { this.stopped = true; this.propagationStopped = true; }
 }
 
 class Element {
@@ -31,6 +33,9 @@ class Element {
         this.hidden = false;
         this.disabled = false;
         this.open = false;
+        this.value = "";
+        this.readOnly = false;
+        this.returnValue = "";
         this.dataset = {};
         this.attributes = new Map();
         this.listeners = new Map();
@@ -59,6 +64,9 @@ class Element {
             this.emit(event.type, event);
             this[`on${event.type}`]?.(event);
         }
+        if (event.bubbles && !event.propagationStopped) {
+            this.ownerDocument.defaultView.emit(event.type, event);
+        }
         return !event.defaultPrevented;
     }
     setAttribute(name, value) { this.attributes.set(name, value); }
@@ -71,9 +79,14 @@ class Element {
     }
     showModal() {
         this.open = true;
-        this.ownerDocument.getElementById("close-help").focus();
+        this.ownerDocument.getElementById(this.id === "progress-import" ? "import-code" : "close-help").focus();
     }
-    close() { this.open = false; this.emit("close"); }
+    close(returnValue = "") { this.returnValue = returnValue; this.open = false; this.emit("close"); }
+    click() {
+        if (this.disabled) return;
+        this.emit("click");
+        if (this.id === "import-submit") this.ownerDocument.getElementById("import-form").emit("submit");
+    }
     closest() { return null; }
     querySelector(selector) {
         return this.ownerDocument.getElementById(selector.startsWith("#") ? selector.slice(1) : `${this.id}:${selector}`);
@@ -93,7 +106,7 @@ class Element {
     }
 }
 
-function setup({ touchDefault = false } = {}) {
+function setup({ touchDefault = false, clipboard } = {}) {
     const elements = new Map();
     const document = new Element("document");
     document.visibilityState = "visible";
@@ -115,6 +128,7 @@ function setup({ touchDefault = false } = {}) {
     canvas.parentElement = get("game-container");
     canvas.focus(); // The original loader does this before initialization.
     const window = new Element("window");
+    document.defaultView = window;
     window.matchMedia = query => ({ matches: query.includes("coarse") ? touchDefault : !touchDefault });
     window.dispatchEvent = event => window.emit(event.type, event);
     window.KeyboardEvent = Event;
@@ -143,6 +157,8 @@ function setup({ touchDefault = false } = {}) {
         now = end;
     }
     const pads = [];
+    const storage = new Map();
+    const microtasks = [];
     const plugins = [];
     const keyDowns = [];
     const heldKeys = new Set();
@@ -150,11 +166,19 @@ function setup({ touchDefault = false } = {}) {
     let controls;
     const context = {
         console: { warn() {}, error() {} }, document, window,
-        navigator: { maxTouchPoints: touchDefault ? 5 : 0, getGamepads: () => pads },
+        navigator: { maxTouchPoints: touchDefault ? 5 : 0, getGamepads: () => pads, clipboard },
+        localStorage: {
+            getItem: key => storage.get(key) ?? null,
+            setItem: (key, value) => storage.set(key, value),
+            removeItem: key => storage.delete(key)
+        },
         InfestationInputMode: InputMode, InfestationDock: Dock, InfestationTips: Tips,
         setTimeout: window.setTimeout, clearTimeout: window.clearTimeout,
+        queueMicrotask: callback => microtasks.push(callback),
         Event, ResizeObserver: class { observe() {} },
-        miniquad_add_plugin: plugin => plugins.push(plugin), load() {}, UTF8ToString: () => "",
+        clipboard: "engine clipboard",
+        miniquad_add_plugin: plugin => plugins.push(plugin), load() {},
+        UTF8ToString: value => typeof value === "string" ? value : "",
         into_sapp_keycode: code => ({ Tab: 258, Enter: 257, Space: 32, Escape: 256, ArrowRight: 262, KeyU: 85 })[code],
         wasm_exports: {
             key_down: (...args) => { keyDowns.push(args); heldKeys.add(args[0]); },
@@ -169,10 +193,13 @@ function setup({ touchDefault = false } = {}) {
         create(options) { controls = window.InfestationTouch.create(options); return controls; }
     };
     vm.runInContext(fs.readFileSync(path.join(repo, "js/quad-gamepad.js"), "utf8"), context);
+    vm.runInContext(fs.readFileSync(path.join(repo, "js/progress.js"), "utf8"), context);
     vm.runInContext(fs.readFileSync(path.join(repo, "js/touch-shell.js"), "utf8"), context);
     const loader = fs.readFileSync(path.join(repo, "js/gl.js"), "utf8");
     vm.runInContext(loader.slice(loader.indexOf("canvas.onkeydown ="), loader.indexOf("canvas.onkeyup =")), context);
     vm.runInContext(loader.slice(loader.indexOf("canvas.onkeyup ="), loader.indexOf("canvas.onkeypress =")), context);
+    const clipboardStart = loader.indexOf('window.addEventListener("copy"');
+    vm.runInContext(loader.slice(clipboardStart, loader.indexOf("window.ondragover", clipboardStart)), context);
     const imports = { env: {} };
     plugins.forEach(plugin => plugin.register_plugin(imports));
     function key(code, type = "keydown", fields = {}) {
@@ -193,8 +220,20 @@ function setup({ touchDefault = false } = {}) {
             buttons: Array.from({ length: 17 }, (_, button) => ({ pressed: buttons.includes(button) })) };
     }
     function loadGame() { poll(); }
+    function flushMicrotasks() {
+        while (microtasks.length) microtasks.shift()();
+    }
+    function openImport() { imports.env.sapp_progress_import(); flushMicrotasks(); }
+    function finishImport() { imports.env.sapp_progress_import_finish(); flushMicrotasks(); }
+    function rejectImport(message) { imports.env.sapp_progress_import_error(message, message.length); flushMicrotasks(); }
+    function takeImportRequest() {
+        const request = storage.get("infestation_progress_import");
+        storage.delete("infestation_progress_import");
+        return request === undefined ? undefined : JSON.parse(request);
+    }
     return { get, document, window, canvas, pads, pad, imports: imports.env, controls,
-        key, poll, loadGame, advance, keyDowns, heldKeys,
+        key, poll, loadGame, advance, keyDowns, heldKeys, takeImportRequest,
+        openImport, finishImport, rejectImport, flushMicrotasks,
         get audioResumes() { return audioResumes; },
         get epoch() { return imports.env.infestation_touch_input_epoch(); } };
 }
@@ -367,6 +406,163 @@ test("native dialog cancellation restores the ready game's focus", () => {
     assert.equal(s.document.activeElement.id, "glcanvas");
     assert.equal(s.imports.infestation_input_blocked(), 0);
 });
+
+test("opening the import dialog releases canvas keys after the engine call returns", () => {
+    const s = setup();
+    s.loadGame();
+    s.key("Enter");
+    s.imports.sapp_progress_import();
+    assert.equal(s.document.activeElement.id, "glcanvas");
+    assert.equal(s.heldKeys.has(257), true);
+    assert.equal(s.get("progress-import").open, false);
+    s.flushMicrotasks();
+    assert.equal(s.document.activeElement.id, "import-code");
+    assert.equal(s.heldKeys.size, 0);
+    assert.equal(s.get("progress-import").open, true);
+});
+
+for (const touchDefault of [false, true]) {
+    test(`progress import accepts pasted text without a Clipboard API (${touchDefault})`, () => {
+        const s = setup({ touchDefault });
+        s.loadGame();
+        s.key("ArrowRight");
+        const before = s.epoch;
+        s.openImport();
+        assert.equal(s.get("progress-import").open, true);
+        assert.equal(s.document.activeElement.id, "import-code");
+        assert.equal(s.heldKeys.size, 0);
+        assert.ok(s.epoch > before);
+        assert.equal(s.get("menu").disabled, true);
+        assert.equal(s.poll().blocked, true);
+        assert.equal(s.takeImportRequest(), undefined);
+
+        s.get("import-code").value = " exported\ncode ";
+        s.get("import-submit").click();
+        assert.deepEqual(s.takeImportRequest(), { action: "submit", code: " exported\ncode " });
+        assert.equal(s.get("progress-import").open, true); // Wait for the game to validate it.
+        assert.equal(s.get("import-submit").disabled, true);
+        s.get("import-submit").click();
+        assert.equal(s.takeImportRequest(), undefined);
+        s.finishImport();
+        assert.equal(s.get("progress-import").open, false);
+        assert.equal(s.poll().blocked, false);
+        assert.equal(s.document.activeElement.id, "glcanvas");
+        assert.equal(s.get("toast").textContent, "Progress imported.");
+    });
+}
+
+test("import never requests clipboard permission even when clipboard reads would reject", () => {
+    let reads = 0;
+    const s = setup({ clipboard: { readText() { reads += 1; throw new Error("NotAllowedError"); } } });
+    s.loadGame();
+    s.openImport();
+    s.get("import-code").value = "pasted code";
+    s.get("import-submit").click();
+    assert.deepEqual(s.takeImportRequest(), { action: "submit", code: "pasted code" });
+    assert.equal(reads, 0);
+});
+
+test("empty and invalid import codes show errors and can be corrected in place", () => {
+    const s = setup();
+    s.loadGame();
+    s.openImport();
+    s.get("import-code").value = " \n\t ";
+    s.get("import-submit").click();
+    assert.equal(s.takeImportRequest(), undefined);
+    assert.equal(s.get("import-error").hidden, false);
+    assert.equal(s.get("import-code").getAttribute("aria-invalid"), "true");
+
+    s.get("import-code").value = "not a code";
+    s.get("import-code").emit("input");
+    s.get("import-submit").click();
+    assert.equal(s.takeImportRequest().code, "not a code");
+    s.rejectImport("invalid base64");
+    assert.equal(s.get("progress-import").open, true);
+    assert.equal(s.get("import-code").value, "not a code");
+    assert.equal(s.get("import-code").readOnly, false);
+    assert.equal(s.get("import-submit").disabled, false);
+    assert.equal(s.get("import-error").hidden, false);
+
+    s.get("import-code").value = "corrected code";
+    s.get("import-code").emit("input");
+    assert.equal(s.get("import-error").hidden, true);
+    s.get("import-submit").click();
+    assert.deepEqual(s.takeImportRequest(), { action: "submit", code: "corrected code" });
+});
+
+for (const cancel of ["button", "Escape", "native"]) {
+    test(`${cancel} cancels a submitted import and leaves no code for a later attempt`, () => {
+        const s = setup();
+        s.loadGame();
+        s.openImport();
+        s.get("import-code").value = "pending code";
+        s.get("import-submit").click();
+        if (cancel === "button") s.get("import-cancel").click();
+        else if (cancel === "Escape") s.key("Escape");
+        else s.get("progress-import").emit("cancel");
+        assert.deepEqual(s.takeImportRequest(), { action: "cancel" });
+        assert.equal(s.get("progress-import").open, false);
+        assert.equal(s.poll().blocked, false);
+        assert.equal(s.document.activeElement.id, "glcanvas");
+        assert.deepEqual(s.keyDowns, []);
+        s.openImport();
+        assert.equal(s.get("import-code").value, "");
+        assert.equal(s.get("import-submit").disabled, false);
+        assert.equal(s.takeImportRequest(), undefined);
+    });
+}
+
+test("editing and paste shortcuts keep their defaults without becoming game input", () => {
+    const s = setup();
+    s.loadGame();
+    s.openImport();
+    for (const code of ["KeyV", "KeyU", "Space", "Enter", "ArrowRight", "Tab"]) {
+        assert.equal(s.key(code, "keydown", { ctrlKey: code === "KeyV" }).defaultPrevented, false);
+    }
+    assert.equal(s.key("KeyU", "keydown", { repeat: true }).defaultPrevented, false);
+    s.pad([0, 1, 9], 0, [1, 0]);
+    assert.equal(s.poll().blocked, true);
+    assert.equal(s.get("progress-import").open, true);
+    s.get("import-cancel").click();
+    assert.equal(s.key("KeyU", "keydown", { repeat: true }).defaultPrevented, true);
+    s.key("KeyU", "keyup");
+    assert.deepEqual(s.keyDowns, []);
+    s.key("KeyU");
+    assert.equal(s.keyDowns.length, 1);
+});
+
+test("native field paste is not cancelled by the engine's window clipboard handler", () => {
+    const s = setup();
+    s.loadGame();
+    // Verify that the real runtime handler would otherwise cancel native paste.
+    const gamePaste = new Event("paste", { bubbles: true, clipboardData: { getData: () => "" } });
+    s.canvas.dispatchEvent(gamePaste);
+    assert.equal(gamePaste.defaultPrevented, true);
+
+    s.openImport();
+    for (const type of ["copy", "cut", "paste"]) {
+        const edit = new Event(type, { bubbles: true });
+        assert.equal(s.get("import-code").dispatchEvent(edit), true);
+        assert.equal(edit.defaultPrevented, false);
+        assert.equal(edit.propagationStopped, true);
+    }
+});
+
+for (const code of ["Enter", "Space"]) {
+    test(`${code} activates import buttons without leaking into gameplay`, () => {
+        const s = setup();
+        s.loadGame();
+        s.openImport();
+        s.get("import-code").value = "exported code";
+        s.get("import-submit").focus();
+        assert.equal(s.key(code).defaultPrevented, true);
+        assert.deepEqual(s.takeImportRequest(), { action: "submit", code: "exported code" });
+        s.finishImport();
+        assert.equal(s.key(code, "keydown", { repeat: true }).defaultPrevented, true);
+        s.key(code, "keyup");
+        assert.deepEqual(s.keyDowns, []);
+    });
+}
 
 test("moving focus from the canvas releases only keys the game actually received", () => {
     const s = setup();
